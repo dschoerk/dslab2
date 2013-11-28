@@ -1,0 +1,31 @@
+*	startFileServer fs1
+*	startProxy proxy
+*	startClient client
+
+fs1: !exit
+client: !login alice 12345
+client: !login alice 12345
+client: !login alice 12345
+client: !login alice 12345
+client: !login alice 12345
+client: !login alice 12345
+client: !login alice 12345
+client: !login alice 12345
+
+proxy: !fileservers
+*	startFileServer fs2
+proxy: !fileservers
+*	startFileServer fs1
+proxy: !fileservers
+proxy: !fileservers
+proxy: !fileservers
+proxy: !fileservers
+proxy: !fileservers
+proxy: !fileservers
+proxy: !fileservers
+
+fs1:  !exit
+fs2: !exit
+proxy:	!exit
+client: !exit
+

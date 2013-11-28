@@ -1,0 +1,7 @@
+*	startProxy proxy
+*	startClient client
+proxy:	!exit
+
+*	startProxy proxy
+proxy:	!exit
+
