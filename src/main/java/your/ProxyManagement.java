@@ -55,7 +55,18 @@ public class ProxyManagement extends UnicastRemoteObject implements MessageInter
 
     @Override
     public void subscribe(RMICallbackInterface client, String file, int trigger) {
-        // TODO Auto-generated method stub
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        try {
+            client.notifySubscriber(file, trigger);
+        } catch (RemoteException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         
     }
 

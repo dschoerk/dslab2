@@ -1,7 +1,9 @@
 package your;
 
-public interface RMICallbackInterface {
+import java.rmi.*;
+
+public interface RMICallbackInterface extends Remote{
     
-    void notifySubscriber(String file, int trigger);
+    void notifySubscriber(String file, int trigger) throws RemoteException;
     
 }

@@ -11,6 +11,7 @@ import java.net.SocketException;
 import java.rmi.NotBoundException;
 import java.rmi.Remote;
 import java.rmi.registry.*;
+import java.rmi.server.UnicastRemoteObject;
 
 import util.ComponentFactory;
 import util.Config;
@@ -35,7 +36,7 @@ import cli.Command;
 import cli.Shell;
 import client.IClientCli;
 
-public class Client implements IClientCli {
+public class Client implements IClientCli, RMICallbackInterface {
 
 	private Socket socket;
 	private ObjectInputStream in;
@@ -73,6 +74,8 @@ public class Client implements IClientCli {
 			Registry registry = LocateRegistry.getRegistry(cfg_mc.getString("proxy.host"),cfg_mc.getInt("proxy.rmi.port"));
 			
 			managementComponent = (MessageInterface)registry.lookup("Proxy");
+			
+			
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -264,8 +267,9 @@ public class Client implements IClientCli {
 	
 	@Command
     public MessageResponse subscribe (String file, int trigger) throws IOException{
-        
-	    return new MessageResponse("TODO: IMPLEMENT!!!");
+	    RMICallbackInterface callback = (RMICallbackInterface)UnicastRemoteObject.exportObject(this, 0);
+        managementComponent.subscribe(callback, file, trigger);
+	    return new MessageResponse("Successfully subscribed for file: "+file);
     }
 	
 	@Command
@@ -287,4 +291,10 @@ public class Client implements IClientCli {
 		System.in.close();
 		return null;
 	}
+
+    @Override
+    public void notifySubscriber(String file, int trigger) {
+        System.out.println("notify!!!");
+        
+    }
 }
