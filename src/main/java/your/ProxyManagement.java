@@ -82,11 +82,14 @@ public class ProxyManagement extends UnicastRemoteObject implements MessageInter
         try {
             registry.unbind("Proxy");
             UnicastRemoteObject.unexportObject(this, true);
+            UnicastRemoteObject.unexportObject(registry,true);
         } catch (AccessException e) {
 
         } catch (RemoteException e) {
 
         } catch (NotBoundException e) {
+
+        } catch (Exception e) {
 
         }
     }
