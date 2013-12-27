@@ -56,6 +56,8 @@ public class Proxy implements IProxyCli, Runnable {
 	private UserDB users = new UserDB();
 	private Thread shellThread, connectionHandler, udpListenerThread;
 	private Timer fileserverOnlineTimer;
+	
+	private ProxyManagement managementComponent;
 
 	public static void main(String[] args) throws Exception {
 
@@ -97,6 +99,8 @@ public class Proxy implements IProxyCli, Runnable {
 
 		fileserverOnlineTimer = new Timer();
 		fileserverOnlineTimer.schedule(fsOnlineTask, 0, checkPeriod);
+		
+		managementComponent = new ProxyManagement();
 	}
 
 	public void removeSession(ProxySession session) {
@@ -184,6 +188,8 @@ public class Proxy implements IProxyCli, Runnable {
 				s.close();
 			}
 		}
+		
+		managementComponent.close();
 
 		System.in.close();
 

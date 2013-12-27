@@ -8,6 +8,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
+import java.rmi.NotBoundException;
+import java.rmi.Remote;
+import java.rmi.registry.*;
 
 import util.ComponentFactory;
 import util.Config;
@@ -39,6 +42,8 @@ public class Client implements IClientCli {
 	private ObjectOutputStream out;
 
 	private File downloadDirectory;
+	
+	MessageInterface managementComponent;
 
 	public static void main(String[] args) throws Exception {
 		ComponentFactory factory = new ComponentFactory(); 
@@ -63,11 +68,19 @@ public class Client implements IClientCli {
 			out = new ObjectOutputStream(socket.getOutputStream());
 			out.flush();
 			in = new ObjectInputStream(socket.getInputStream());
-
+			
+			Config cfg_mc = new Config("mc");
+			Registry registry = LocateRegistry.getRegistry(cfg_mc.getString("proxy.host"),cfg_mc.getInt("proxy.rmi.port"));
+			
+			managementComponent = (MessageInterface)registry.lookup("Proxy");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		}
+		} catch (NotBoundException e) {
+            // TODO Auto-generated catch block
+		    System.out.println("Proxy RMI not registered");
+            e.printStackTrace();
+        }
 	}
 
 	@Command
@@ -230,6 +243,42 @@ public class Client implements IClientCli {
 
 		return new MessageResponse("Successfully logged out.");
 	}
+	
+	@Command
+	public MessageResponse readQuorum() throws IOException{
+	    
+	    return new MessageResponse(""+managementComponent.getReadQuorum());
+	}
+	
+	@Command
+    public MessageResponse writeQuorum() throws IOException{
+        
+        return new MessageResponse(""+managementComponent.getWriteQuorum());
+    }
+	
+	@Command
+    public MessageResponse topThreeDownloads() throws IOException{
+        
+	    return new MessageResponse("TODO: IMPLEMENT!!!");
+    }
+	
+	@Command
+    public MessageResponse subscribe (String file, int trigger) throws IOException{
+        
+	    return new MessageResponse("TODO: IMPLEMENT!!!");
+    }
+	
+	@Command
+    public MessageResponse getProxyPublicKey() throws IOException{
+        
+	    return new MessageResponse("TODO: IMPLEMENT!!!");
+    }
+	
+	@Command
+    public MessageResponse setUserPublicKey(String user) throws IOException{
+        
+        return new MessageResponse("TODO: IMPLEMENT!!!");
+    }
 
 	@Command
 	@Override
