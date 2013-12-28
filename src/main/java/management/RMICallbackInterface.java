@@ -1,4 +1,4 @@
-package your;
+package management;
 
 import java.rmi.*;
 

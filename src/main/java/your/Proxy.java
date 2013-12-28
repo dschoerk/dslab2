@@ -19,6 +19,7 @@ import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import management.ProxyManagement;
 import message.Request;
 import message.Response;
 import message.request.DownloadFileRequest;

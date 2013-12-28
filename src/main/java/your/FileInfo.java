@@ -5,11 +5,14 @@ public class FileInfo {
 	private long size;
 	private String name;
 	private byte[] data;
+    private int downloadCnt;
 
 	public FileInfo(String name, long size) {
 		this.name = name;
 		this.size = size;
 		this.data = null;
+		
+		downloadCnt = 0;
 	}
 
 	public FileInfo(String name, long size, byte[] data) {
@@ -28,5 +31,13 @@ public class FileInfo {
 
 	public byte[] getContent() {
 		return data;
+	}
+	
+	public int getDownloadCnt() {
+        return downloadCnt;
+    }
+
+    public void incDownloadCnt(){
+	    downloadCnt++;
 	}
 }

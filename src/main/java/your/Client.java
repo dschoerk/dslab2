@@ -16,6 +16,8 @@ import java.rmi.server.UnicastRemoteObject;
 
 import util.ComponentFactory;
 import util.Config;
+import management.MessageInterface;
+import management.RMICallbackInterface;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;

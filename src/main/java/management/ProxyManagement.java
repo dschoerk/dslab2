@@ -1,26 +1,33 @@
-package your;
+package management;
 
 import java.rmi.*;
 import java.rmi.registry.*;
 import java.rmi.server.UnicastRemoteObject;
+import java.util.ArrayList;
 import java.util.List;
 
 import util.Config;
+import your.FileInfo;
 
-public class ProxyManagement extends UnicastRemoteObject implements MessageInterface {
+public class ProxyManagement extends UnicastRemoteObject implements
+        MessageInterface {
 
     /**
      * 
      */
     private static final long serialVersionUID = -5522795323645760709L;
     Registry registry;
-    
-    public ProxyManagement() throws RemoteException
-    {
+
+    ArrayList<Subscription> subscribers;
+
+    public ProxyManagement() throws RemoteException {
+
         Config cfg = new Config("mc");
-        
+        subscribers = new ArrayList<Subscription>();
+
         try {
-            registry = LocateRegistry.createRegistry(cfg.getInt("proxy.rmi.port"));
+            registry = LocateRegistry.createRegistry(cfg
+                    .getInt("proxy.rmi.port"));
             registry.rebind("Proxy", this);
 
         } catch (RemoteException e) {
@@ -54,19 +61,9 @@ public class ProxyManagement extends UnicastRemoteObject implements MessageInter
     }
 
     @Override
-    public void subscribe(RMICallbackInterface client, String file, int trigger) {
-        try {
-            Thread.sleep(3000);
-        } catch (InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        try {
-            client.notifySubscriber(file, trigger);
-        } catch (RemoteException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+    public void subscribe(RMICallbackInterface client,String user, String file, int trigger) {
+
+        subscribers.add(new Subscription(user, file, trigger, client));
         
     }
 
@@ -74,15 +71,38 @@ public class ProxyManagement extends UnicastRemoteObject implements MessageInter
     public void setUserPublicKey(String user, char[] key)
             throws RemoteException {
         // TODO Auto-generated method stub
-        
+
     }
-    
-    public void close()
-    {
+
+    public void updateSubscriptions(FileInfo file) {
+
+        for (Subscription s : subscribers) {
+            if (s.getFile().equals(file.getName()) && s.getTrigger() >= file.getDownloadCnt()) {
+                try {
+                    s.getCallback().notifySubscriber(s.getFile(),
+                            s.getTrigger());
+                    subscribers.remove(s);
+                } catch (RemoteException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
+
+    public void removeSubscriptions(String user) {
+
+        for (Subscription s : subscribers) {
+            if (s.getUser().equals(user)) {
+                subscribers.remove(s);
+            }
+        }
+    }
+
+    public void close() {
         try {
             registry.unbind("Proxy");
             UnicastRemoteObject.unexportObject(this, true);
-            UnicastRemoteObject.unexportObject(registry,true);
+            UnicastRemoteObject.unexportObject(registry, true);
         } catch (AccessException e) {
 
         } catch (RemoteException e) {
@@ -93,6 +113,5 @@ public class ProxyManagement extends UnicastRemoteObject implements MessageInter
 
         }
     }
-
 
 }
