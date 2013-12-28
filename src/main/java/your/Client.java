@@ -279,7 +279,7 @@ public class Client implements IClientCli, RMICallbackInterface {
             System.out.println("reexport");
         }
         RMICallbackInterface callback = (RMICallbackInterface) this;
-        managementComponent.subscribe(callback, file, trigger);
+        managementComponent.subscribe(callback,"", file, trigger);
         return new MessageResponse("Successfully subscribed for file: " + file);
     }
 
