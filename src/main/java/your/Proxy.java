@@ -101,7 +101,7 @@ public class Proxy implements IProxyCli, Runnable {
 		fileserverOnlineTimer = new Timer();
 		fileserverOnlineTimer.schedule(fsOnlineTask, 0, checkPeriod);
 		
-		managementComponent = new ProxyManagement();
+		managementComponent = new ProxyManagement(this);
 	}
 
 	public void removeSession(ProxySession session) {

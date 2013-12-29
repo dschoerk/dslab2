@@ -3,11 +3,12 @@ package management;
 import java.rmi.*;
 import java.rmi.registry.*;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
+import java.util.Map.Entry;
 
 import util.Config;
 import your.FileInfo;
+import your.Proxy;
 
 public class ProxyManagement extends UnicastRemoteObject implements
         MessageInterface {
@@ -19,9 +20,11 @@ public class ProxyManagement extends UnicastRemoteObject implements
     Registry registry;
 
     ArrayList<Subscription> subscribers;
+    Proxy parent;
+    
+    public ProxyManagement(Proxy parent) throws RemoteException {
 
-    public ProxyManagement() throws RemoteException {
-
+        this.parent=parent;
         Config cfg = new Config("mc");
         subscribers = new ArrayList<Subscription>();
 
@@ -50,9 +53,43 @@ public class ProxyManagement extends UnicastRemoteObject implements
 
     @Override
     public List<String> getTopThree() throws RemoteException {
-        // TODO Auto-generated method stub
-        return null;
+        
+        Map<String,FileInfo> files = sortByValues(parent.getFiles());
+        files.putAll(parent.getFiles());
+        ArrayList<String> ret = new ArrayList<String>(3);
+        int i=0;
+        for(Entry<String,FileInfo> e : files.entrySet())
+        {
+            FileInfo fi = e.getValue();
+            ret.add(i,(i+1)+". "+fi.getName()+"\t\t"+fi.getDownloadCnt()+"\n");
+            i++;
+            if(i==3)return ret;
+        }
+        return ret;
     }
+    
+    public static <K extends Comparable,V extends Comparable> Map<K,V> sortByValues(Map<K,V> map){
+        List<Map.Entry<K,V>> entries = new LinkedList<Map.Entry<K,V>>(map.entrySet());
+      
+        Collections.sort(entries, new Comparator<Map.Entry<K,V>>() {
+
+            @Override
+            public int compare(Entry<K, V> o1, Entry<K, V> o2) {
+                return o1.getValue().compareTo(o2.getValue());
+            }
+        });
+      
+        //LinkedHashMap will keep the keys in the order they are inserted
+        //which is currently sorted on natural ordering
+        Map<K,V> sortedMap = new LinkedHashMap<K,V>();
+      
+        for(Map.Entry<K,V> entry: entries){
+            sortedMap.put(entry.getKey(), entry.getValue());
+        }
+      
+        return sortedMap;
+    }
+    
 
     @Override
     public char[] getProxyPublicKey() throws RemoteException {

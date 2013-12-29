@@ -168,6 +168,9 @@ public class ProxySession implements Runnable, IProxy {
 				fileserver.getAddress(), fileserver.getTcpport());
 
 		user.addCredits(-infoResponseObj.getSize());
+		if(parent.getFiles().get(infoResponseObj.getFilename())!=null){
+		    parent.getFiles().get(infoResponseObj.getFilename()).incDownloadCnt();
+		}
 		fileserver.incUsage(infoResponseObj.getSize());
 
 		DownloadTicketResponse response = new DownloadTicketResponse(ticket);
