@@ -11,6 +11,7 @@
 
 	<path id="project.classpath">
 		<pathelement location="${build.dir}" />
+		<pathelement location="lib/bcprov-jdk16-140.jar"/> 
 		<pathelement location="lib/hamcrest-core-1.3.jar" />
 		<pathelement location="lib/junit-4.11.jar" />
 	</path>
@@ -44,13 +45,17 @@
 	<target name="run-proxy" depends="compile" description="Run proxy.">
 		<java classname="your.Proxy" fork="true" classpathref="project.classpath" />
 	</target>
-
+	
 	<target name="run-fileserver1" depends="compile" description="Run 1st fileserver.">
-		<java classname="your.Fileserver" fork="true" classpathref="project.classpath" />
+	    <java classname="your.Fileserver" fork="true" classpathref="project.classpath">
+	    	<arg value="fs1.properties"/>
+	    </java>
 	</target>
 
 	<target name="run-fileserver2" depends="compile" description="Run 2nd fileserver.">
-		<java classname="your.Fileserver" fork="true" classpathref="project.classpath" />
+	    <java classname="your.Fileserver" fork="true" classpathref="project.classpath">
+	    	<arg value="fs2.properties"/>
+	    </java>
 	</target>
 
 	<target name="run-client" depends="compile" description="Run client.">
