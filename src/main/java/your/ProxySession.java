@@ -10,7 +10,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 
 import message.Response;
 import message.request.BuyRequest;
@@ -169,9 +168,6 @@ public class ProxySession implements Runnable, IProxy {
 				fileserver.getAddress(), fileserver.getTcpport());
 
 		user.addCredits(-infoResponseObj.getSize());
-		if(parent.getFiles().get(infoResponseObj.getFilename())!=null){
-		    parent.getFiles().get(infoResponseObj.getFilename()).incDownloadCnt();
-		}
 		fileserver.incUsage(infoResponseObj.getSize());
 
 		DownloadTicketResponse response = new DownloadTicketResponse(ticket);

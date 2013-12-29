@@ -1,8 +1,6 @@
 package your;
 
-import java.util.Comparator;
-
-public class FileInfo implements Comparable<FileInfo>{
+public class FileInfo {
 
 	private long size;
 	private String name;
@@ -42,10 +40,4 @@ public class FileInfo implements Comparable<FileInfo>{
     public void incDownloadCnt(){
 	    downloadCnt++;
 	}
-
-    @Override
-    public int compareTo(FileInfo o) {
-        return getDownloadCnt()<=o.getDownloadCnt() ? 1 : -1;
-    }
-
 }

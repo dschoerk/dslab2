@@ -13,7 +13,6 @@ import java.rmi.Remote;
 import java.rmi.registry.*;
 import java.rmi.server.ExportException;
 import java.rmi.server.UnicastRemoteObject;
-import java.util.*;
 
 import util.ComponentFactory;
 import util.Config;
@@ -268,12 +267,7 @@ public class Client implements IClientCli, RMICallbackInterface {
     @Command
     public MessageResponse topThreeDownloads() throws IOException {
 
-        String out="";
-        List<String> top =managementComponent.getTopThree();
-        for(String line : top){
-            out+=line;
-        }
-        return new MessageResponse(out);
+        return new MessageResponse("TODO: IMPLEMENT!!!");
     }
 
     @Command
