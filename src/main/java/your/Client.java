@@ -6,6 +6,8 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.rmi.NotBoundException;
@@ -13,13 +15,12 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.ExportException;
 import java.rmi.server.UnicastRemoteObject;
-import java.security.AlgorithmParameterGenerator;
-import java.security.AlgorithmParameters;
 import java.security.Key;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.List;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -56,6 +57,7 @@ import org.bouncycastle.openssl.PEMReader;
 import org.bouncycastle.openssl.PasswordFinder;
 import org.bouncycastle.util.encoders.Base64;
 
+import util.ComponentFactory;
 import util.Config;
 import cli.Command;
 import cli.Shell;
@@ -76,30 +78,29 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 	public static void main(String[] args) throws Exception {
 
+		ComponentFactory factory = new ComponentFactory();
+		Shell shell = new Shell("Client", System.out, System.in);
+		Config cfg = new Config("client");
+		factory.startClient(cfg, shell);
+
 		/*
-		 * ComponentFactory factory = new ComponentFactory(); Shell shell = new
-		 * Shell("Client", System.out, System.in); Config cfg = new
-		 * Config("client"); factory.startClient(cfg, shell);
+		 * KeyGenerator gen = KeyGenerator.getInstance("AES"); gen.init(256);
+		 * SecretKey key = gen.generateKey();
+		 * 
+		 * SecureRandom rand = new SecureRandom(); byte[] iv = new byte[16];
+		 * rand.nextBytes(iv);
+		 * 
+		 * Cipher cipher_enc = Cipher.getInstance("AES/CTR/NoPadding");
+		 * cipher_enc.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
+		 * 
+		 * Cipher cipher_dec = Cipher.getInstance("AES/CTR/NoPadding");
+		 * cipher_dec.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
+		 * 
+		 * String message = "asdf";
+		 * 
+		 * byte[] dec = cipher_enc.doFinal(message.getBytes());
+		 * System.out.println(new String(cipher_dec.doFinal(dec)));
 		 */
-
-		KeyGenerator gen = KeyGenerator.getInstance("AES");
-		gen.init(256);
-		SecretKey key = gen.generateKey();
-
-		SecureRandom rand = new SecureRandom();
-		byte[] iv = new byte[16];
-		rand.nextBytes(iv);
-
-		Cipher cipher_enc = Cipher.getInstance("AES/CTR/NoPadding");
-		cipher_enc.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
-
-		Cipher cipher_dec = Cipher.getInstance("AES/CTR/NoPadding");
-		cipher_dec.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
-
-		String message = "asdf";
-
-		byte[] dec = cipher_enc.doFinal(message.getBytes());
-		System.out.println(new String(cipher_dec.doFinal(dec)));
 	}
 
 	public Client(File downloadDir, String host, int port, PublicKey pubk, File keyDir, Shell shell) {
@@ -140,7 +141,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 	private PrivateKey getUserKey(String username) {
 		System.out.println(keyDir.listFiles().length);
 		for (File s : keyDir.listFiles()) {
-			if (s.getName().equals(username+".pem")) {
+			if (s.getName().equals(username + ".pem")) {
 				System.out.println("found");
 				try {
 					PEMReader in = new PEMReader(new FileReader(s.getAbsolutePath()), new PasswordFinder() {
@@ -160,7 +161,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 					PrivateKey privKey = keyPair.getPrivate();
 					in.close();
 					return privKey;
-					
+
 				} catch (FileNotFoundException e) {
 					e.printStackTrace();
 				} catch (IOException e) {
@@ -191,10 +192,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 			rsaChannelToProxy.write(message);
 			response = (LoginMessage2nd) rsaChannelFromProxy.read();
 			LoginMessage2nd msg_2nd = (LoginMessage2nd) response;
-			
+
 			LoginMessage3rd msg_3rd = new LoginMessage3rd(msg_2nd.getProxyChallenge());
 			rsaChannelToProxy.write(msg_3rd);
-			
+
 			response = rsaChannelFromProxy.read();
 			LoginResponse loginresponse = (LoginResponse) response;
 			return loginresponse;
@@ -213,7 +214,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		CreditsRequest message = new CreditsRequest();
 
-		Response response = null;
+		Response response;
 		try {
 			channel.write(message);
 			response = (Response) channel.read();
@@ -341,6 +342,13 @@ public class Client implements IClientCli, RMICallbackInterface {
 		LogoutRequest message = new LogoutRequest();
 		channel.write(message);
 
+		// muss gelesen werden!
+		try {
+			MessageResponse uploadresponse = (MessageResponse) channel.read();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 		return new MessageResponse("Successfully logged out.");
 	}
 
@@ -358,8 +366,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 	@Command
 	public MessageResponse topThreeDownloads() throws IOException {
-
-		return new MessageResponse("TODO: IMPLEMENT!!!");
+		String out = "";
+		List<String> top = managementComponent.getTopThree();
+		for (String line : top) {
+			out += line;
+		}
+		return new MessageResponse(out);
 	}
 
 	@Command

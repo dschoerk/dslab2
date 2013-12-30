@@ -219,6 +219,12 @@ public class ProxySession implements Runnable, IProxy {
 				fileserver.getAddress(), fileserver.getTcpport());
 
 		user.addCredits(-infoResponseObj.getSize());
+		FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
+		if(file!=null){
+		    file.incDownloadCnt();
+		    parent.getManagementComonent().updateSubscriptions(file);
+		}
+		
 		fileserver.incUsage(infoResponseObj.getSize());
 
 		DownloadTicketResponse response = new DownloadTicketResponse(ticket);
@@ -240,6 +246,7 @@ public class ProxySession implements Runnable, IProxy {
 
 	@Override
 	public MessageResponse logout() throws IOException {
+	    if(user!=null) parent.getManagementComonent().removeSubscriptions(user.getName());
 		user = null;
 		return new MessageResponse("User logged out");
 	}
