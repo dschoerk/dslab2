@@ -249,7 +249,14 @@ public class Client implements IClientCli, RMICallbackInterface {
     public MessageResponse logout() throws IOException {
         LogoutRequest message = new LogoutRequest();
         out.writeObject(message);
-
+        
+        //muss gelesen werden!
+        try {
+            MessageResponse uploadresponse = (MessageResponse) in.readObject();
+        } catch (ClassNotFoundException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         return new MessageResponse("Successfully logged out.");
     }
 

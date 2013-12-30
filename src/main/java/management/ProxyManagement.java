@@ -21,10 +21,10 @@ public class ProxyManagement extends UnicastRemoteObject implements
 
     ArrayList<Subscription> subscribers;
     Proxy parent;
-    
+
     public ProxyManagement(Proxy parent) throws RemoteException {
 
-        this.parent=parent;
+        this.parent = parent;
         Config cfg = new Config("mc");
         subscribers = new ArrayList<Subscription>();
 
@@ -53,43 +53,46 @@ public class ProxyManagement extends UnicastRemoteObject implements
 
     @Override
     public List<String> getTopThree() throws RemoteException {
-        
-        Map<String,FileInfo> files = sortByValues(parent.getFiles());
+
+        Map<String, FileInfo> files = sortByValues(parent.getFiles());
         files.putAll(parent.getFiles());
         ArrayList<String> ret = new ArrayList<String>(3);
-        int i=0;
-        for(Entry<String,FileInfo> e : files.entrySet())
-        {
+        int i = 0;
+        for (Entry<String, FileInfo> e : files.entrySet()) {
             FileInfo fi = e.getValue();
-            ret.add(i,(i+1)+". "+fi.getName()+"\t\t"+fi.getDownloadCnt()+"\n");
+            ret.add(i,
+                    (i + 1) + ". " + fi.getName() + "\t\t"
+                            + fi.getDownloadCnt() + "\n");
             i++;
-            if(i==3)return ret;
+            if (i == 3)
+                return ret;
         }
         return ret;
     }
-    
-    public static <K extends Comparable,V extends Comparable> Map<K,V> sortByValues(Map<K,V> map){
-        List<Map.Entry<K,V>> entries = new LinkedList<Map.Entry<K,V>>(map.entrySet());
-      
-        Collections.sort(entries, new Comparator<Map.Entry<K,V>>() {
+
+    public static <K extends Comparable, V extends Comparable> Map<K, V> sortByValues(
+            Map<K, V> map) {
+        List<Map.Entry<K, V>> entries = new LinkedList<Map.Entry<K, V>>(
+                map.entrySet());
+
+        Collections.sort(entries, new Comparator<Map.Entry<K, V>>() {
 
             @Override
             public int compare(Entry<K, V> o1, Entry<K, V> o2) {
                 return o1.getValue().compareTo(o2.getValue());
             }
         });
-      
-        //LinkedHashMap will keep the keys in the order they are inserted
-        //which is currently sorted on natural ordering
-        Map<K,V> sortedMap = new LinkedHashMap<K,V>();
-      
-        for(Map.Entry<K,V> entry: entries){
+
+        // LinkedHashMap will keep the keys in the order they are inserted
+        // which is currently sorted on natural ordering
+        Map<K, V> sortedMap = new LinkedHashMap<K, V>();
+
+        for (Map.Entry<K, V> entry : entries) {
             sortedMap.put(entry.getKey(), entry.getValue());
         }
-      
+
         return sortedMap;
     }
-    
 
     @Override
     public char[] getProxyPublicKey() throws RemoteException {
@@ -98,10 +101,11 @@ public class ProxyManagement extends UnicastRemoteObject implements
     }
 
     @Override
-    public void subscribe(RMICallbackInterface client,String user, String file, int trigger) {
-
-        subscribers.add(new Subscription(user, file, trigger, client));
-        
+    public void subscribe(RMICallbackInterface client, String user,
+            String file, int trigger) {
+        synchronized (subscribers) {
+            subscribers.add(new Subscription(user, file, trigger, client));
+        }
     }
 
     @Override
@@ -112,25 +116,28 @@ public class ProxyManagement extends UnicastRemoteObject implements
     }
 
     public void updateSubscriptions(FileInfo file) {
-
-        for (Subscription s : subscribers) {
-            if (s.getFile().equals(file.getName()) && s.getTrigger() >= file.getDownloadCnt()) {
-                try {
-                    s.getCallback().notifySubscriber(s.getFile(),
-                            s.getTrigger());
-                    subscribers.remove(s);
-                } catch (RemoteException e) {
-                    e.printStackTrace();
+        ArrayList<Subscription> toRemove = new ArrayList<Subscription>();
+        synchronized (subscribers) {
+            for (Subscription s : subscribers) {
+                if (s.getFile().equals(file.getName()) && s.getTrigger() <= file.getDownloadCnt()) {
+                    try {
+                        s.getCallback().notifySubscriber(s.getFile(), s.getTrigger());
+                        toRemove.add(s);
+                    } catch (RemoteException e) {
+                        e.printStackTrace();
+                    }
                 }
             }
         }
+        subscribers.removeAll(toRemove);
     }
 
     public void removeSubscriptions(String user) {
-
-        for (Subscription s : subscribers) {
-            if (s.getUser().equals(user)) {
-                subscribers.remove(s);
+        synchronized(subscribers){
+            for (Subscription s : subscribers) {
+                if (s.getUser().equals(user)) {
+                    subscribers.remove(s);
+                }
             }
         }
     }

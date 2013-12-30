@@ -338,4 +338,8 @@ public class Proxy implements IProxyCli, Runnable {
 	public Map<String, FileInfo> getFiles() {
 		return knownFiles;
 	}
+	
+	public ProxyManagement getManagementComonent(){
+	    return managementComponent;
+	}
 }
