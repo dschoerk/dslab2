@@ -10,6 +10,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.Key;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
@@ -29,6 +30,7 @@ public class Fileserver implements IFileServerCli, Runnable {
 	private ServerSocket tcpServer;
 	private ExecutorService threadpool;
 	private Timer aliveTimer;
+	private Key shaKey;
 
 	public static void main(String[] args) throws Exception {
 		ComponentFactory factory = new ComponentFactory(); 
@@ -37,7 +39,7 @@ public class Fileserver implements IFileServerCli, Runnable {
 		factory.startFileServer(cfg, shell);
 	}
 
-	public Fileserver(String fileserverdir, int tcpport, String proxyhost, int proxyudpport, int fileserverminalive,
+	public Fileserver(Key shaKey, String fileserverdir, int tcpport, String proxyhost, int proxyudpport, int fileserverminalive,
 			Shell shell) throws IOException {
 
 		if (shell != null) {
@@ -46,6 +48,7 @@ public class Fileserver implements IFileServerCli, Runnable {
 			shellThread.start();
 		}
 
+		this.shaKey = shaKey;
 		downloadDir = new File(fileserverdir);
 
 		InetAddress receiverAddress = InetAddress.getByName(proxyhost);

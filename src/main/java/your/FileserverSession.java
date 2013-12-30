@@ -3,8 +3,6 @@ package your;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
@@ -25,6 +23,8 @@ import message.response.ListResponse;
 import message.response.MessageResponse;
 import message.response.VersionResponse;
 import model.DownloadTicket;
+import networkio.Channel;
+import networkio.TCPChannel;
 import server.IFileServer;
 import util.ChecksumUtils;
 
@@ -33,8 +33,7 @@ public class FileserverSession implements IFileServer, Runnable {
 	private Socket socket;
 	private Fileserver parent;
 
-	private ObjectOutputStream out;
-	private ObjectInputStream in;
+	private Channel channel;
 
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
 	private static Set<Class<?>> hasArgument = new HashSet<Class<?>>();
@@ -45,13 +44,9 @@ public class FileserverSession implements IFileServer, Runnable {
 		this.parent = parent;
 
 		try {
-			out = new ObjectOutputStream(socket.getOutputStream());
-			out.flush();
-			in = new ObjectInputStream(socket.getInputStream());
-
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+			channel = new TCPChannel(socket);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -59,14 +54,14 @@ public class FileserverSession implements IFileServer, Runnable {
 	public void run() {
 
 		try {
-			Object o = in.readObject();
+			Object o = channel.read();
 			Object response = null;
 			if (hasArgument.contains(o.getClass())) {
 				response = commandMap.get(o.getClass()).invoke(this, o);
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
-			out.writeObject(response);
+			channel.write(response);
 
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block

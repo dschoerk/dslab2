@@ -80,25 +80,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 		Shell shell = new Shell("Client", System.out, System.in);
 		Config cfg = new Config("client");
 		factory.startClient(cfg, shell);
-
-		/*
-		 * KeyGenerator gen = KeyGenerator.getInstance("AES"); gen.init(256);
-		 * SecretKey key = gen.generateKey();
-		 * 
-		 * SecureRandom rand = new SecureRandom(); byte[] iv = new byte[16];
-		 * rand.nextBytes(iv);
-		 * 
-		 * Cipher cipher_enc = Cipher.getInstance("AES/CTR/NoPadding");
-		 * cipher_enc.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
-		 * 
-		 * Cipher cipher_dec = Cipher.getInstance("AES/CTR/NoPadding");
-		 * cipher_dec.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
-		 * 
-		 * String message = "asdf";
-		 * 
-		 * byte[] dec = cipher_enc.doFinal(message.getBytes());
-		 * System.out.println(new String(cipher_dec.doFinal(dec)));
-		 */
 	}
 
 	public Client(File downloadDir, String host, int port, PublicKey pubk, File keyDir, Shell shell) {
@@ -136,7 +117,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 		}
 	}
 
-	private PrivateKey getUserKey(String username) {
+	private PrivateKey getUserKey(String username, final String password) {
 		System.out.println(keyDir.listFiles().length);
 		for (File s : keyDir.listFiles()) {
 			if (s.getName().equals(username + ".pem")) {
@@ -145,13 +126,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 					PEMReader in = new PEMReader(new FileReader(s.getAbsolutePath()), new PasswordFinder() {
 						@Override
 						public char[] getPassword() {
-							try {
-								char[] a = new char[] { '1', '2', '3', '4', '5' };
-								return a;
-							} catch (Exception e) {
-								e.printStackTrace();
-							}
-							return null;
+							return password.toCharArray();
 						}
 					});
 
@@ -175,7 +150,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public LoginResponse login(String username, String password) throws IOException {
 
-		Key privk = getUserKey(username); // read private key for username
+		Key privk = getUserKey(username, password); // read private key for
+													// username
 		rsaChannelFromProxy = new RSAChannel(channel, privk, Cipher.DECRYPT_MODE);
 
 		SecureRandom rand = new SecureRandom();
@@ -190,10 +166,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 			rsaChannelToProxy.write(message);
 			response = (LoginMessage2nd) rsaChannelFromProxy.read();
 			LoginMessage2nd msg_2nd = (LoginMessage2nd) response;
-			
-			byte [] key = Base64.decode(msg_2nd.getSecretKey());
+
+			byte[] key = Base64.decode(msg_2nd.getSecretKey());
 			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
-			byte [] iv = Base64.decode(msg_2nd.getIV());
+			byte[] iv = Base64.decode(msg_2nd.getIV());
 			channel = new AESChannel(channel, originalKey, iv);
 
 			LoginMessage3rd msg_3rd = new LoginMessage3rd(msg_2nd.getProxyChallenge());
@@ -207,6 +183,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 			e.printStackTrace();
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		} catch (SocketException e) {
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+		} catch (IOException e) {
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
 	}

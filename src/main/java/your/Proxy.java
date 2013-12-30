@@ -9,6 +9,7 @@ import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
@@ -69,6 +70,7 @@ public class Proxy implements IProxyCli, Runnable {
 
 	private PrivateKey privKey;
 	private File keyFolder;
+	private Key shaKey;
 
 	public static void main(String[] args) throws Exception {
 
@@ -78,7 +80,7 @@ public class Proxy implements IProxyCli, Runnable {
 		factory.startProxy(cfg, shell);
 	}
 
-	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, File keyFolder, PrivateKey privKey,
+	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, Key shaKey, File keyFolder, PrivateKey privKey,
 			Shell shell) throws IOException {
 		if (shell != null) {
 			shell.register(this);
@@ -88,6 +90,7 @@ public class Proxy implements IProxyCli, Runnable {
 
 		this.privKey = privKey;
 		this.keyFolder = keyFolder;
+		this.shaKey = shaKey;
 
 		knownFileservers = Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
 		sessions = Collections.synchronizedList(new ArrayList<ProxySession>());

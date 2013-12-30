@@ -178,8 +178,10 @@ public class ProxySession implements Runnable, IProxy {
 
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
-			e.printStackTrace();
 
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+		} catch (IOException e)
+		{
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
 

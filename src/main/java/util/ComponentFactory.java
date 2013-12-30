@@ -1,13 +1,18 @@
 package util;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileReader;
+import java.security.Key;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
+import javax.crypto.spec.SecretKeySpec;
+
 import org.bouncycastle.openssl.PEMReader;
 import org.bouncycastle.openssl.PasswordFinder;
+import org.bouncycastle.util.encoders.Hex;
 
 import proxy.IProxyCli;
 import server.IFileServerCli;
@@ -46,6 +51,7 @@ public class ComponentFactory {
 		PEMReader in = new PEMReader(new FileReader(proxyPublicKeyPath));
 		PublicKey pubk = (PublicKey) in.readObject();
 		in.close();
+		
 		return new Client(new File(downloaddir), host, port, pubk, new File(keydir), shell);
 	}
 
@@ -95,8 +101,16 @@ public class ComponentFactory {
 		KeyPair keyPair = (KeyPair) in.readObject();
 		PrivateKey privKey = keyPair.getPrivate();
 		in.close();
+		
+		String hmacKey = config.getString("hmac.key");
+		byte[] keyBytes = new byte[1024];
+		FileInputStream fis = new FileInputStream(hmacKey);
+		fis.read(keyBytes);
+		fis.close();
+		byte[] keyData = Hex.decode(keyBytes);
+		Key shaKey = new SecretKeySpec(keyData, "HmacSHA256");
 
-		return new Proxy(tcpPort, udpPort, timeout, checkPeriod, new File(keydir), privKey, shell);
+		return new Proxy(tcpPort, udpPort, timeout, checkPeriod, shaKey, new File(keydir), privKey, shell);
 	}
 
 	/**
@@ -120,7 +134,16 @@ public class ComponentFactory {
 		String proxyhost = config.getString("proxy.host");
 		int proxyudpport = config.getInt("proxy.udp.port");
 		int fileserverminalive = config.getInt("fileserver.alive");
+		
+		String hmacKey = config.getString("hmac.key");
+		byte[] keyBytes = new byte[1024];
+		FileInputStream fis = new FileInputStream(hmacKey);
+		fis.read(keyBytes);
+		fis.close();
+		byte[] keyData = Hex.decode(keyBytes);
+		Key shaKey = new SecretKeySpec(keyData, "HmacSHA256");
 
-		return new Fileserver(fileserverdir, tcpport, proxyhost, proxyudpport, fileserverminalive, shell);
+
+		return new Fileserver(shaKey, fileserverdir, tcpport, proxyhost, proxyudpport, fileserverminalive, shell);
 	}
 }
