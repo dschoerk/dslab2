@@ -1,6 +1,13 @@
 package util;
 
 import java.io.File;
+import java.io.FileReader;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+
+import org.bouncycastle.openssl.PEMReader;
+import org.bouncycastle.openssl.PasswordFinder;
 
 import proxy.IProxyCli;
 import server.IFileServerCli;
@@ -33,8 +40,13 @@ public class ComponentFactory {
 		String host = config.getString("proxy.host");
 		int port = config.getInt("proxy.tcp.port");
 		String downloaddir = config.getString("download.dir");
+		String keydir = config.getString("keys.dir");
 
-		return new Client(new File(downloaddir), host, port, shell);
+		String proxyPublicKeyPath = config.getString("proxy.key");
+		PEMReader in = new PEMReader(new FileReader(proxyPublicKeyPath));
+		PublicKey pubk = (PublicKey) in.readObject();
+		in.close();
+		return new Client(new File(downloaddir), host, port, pubk, new File(keydir), shell);
 	}
 
 	/**
@@ -56,8 +68,35 @@ public class ComponentFactory {
 		int udpPort = config.getInt("udp.port");
 		int timeout = config.getInt("fileserver.timeout");
 		int checkPeriod = config.getInt("fileserver.checkPeriod");
+		String keydir = config.getString("keys.dir");
 
-		return new Proxy(tcpPort, udpPort, timeout, checkPeriod, shell);
+		String pathtoprivkey = config.getString("key");
+		System.out.println(pathtoprivkey);
+		PEMReader in = new PEMReader(new FileReader(pathtoprivkey), new PasswordFinder() {
+
+			@Override
+			public char[] getPassword() {
+				// return
+				try {
+
+					// char [] a = new BufferedReader(new
+					// InputStreamReader(System.in)).readLine().toCharArray();
+					char[] a = new char[] { '1', '2', '3', '4', '5' };
+
+					return a;
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				return null;
+			}
+		});
+
+		KeyPair keyPair = (KeyPair) in.readObject();
+		PrivateKey privKey = keyPair.getPrivate();
+		in.close();
+
+		return new Proxy(tcpPort, udpPort, timeout, checkPeriod, new File(keydir), privKey, shell);
 	}
 
 	/**
@@ -73,8 +112,7 @@ public class ComponentFactory {
 	 * @throws Exception
 	 *             if an exception occurs
 	 */
-	public IFileServerCli startFileServer(Config config, Shell shell)
-			throws Exception {
+	public IFileServerCli startFileServer(Config config, Shell shell) throws Exception {
 		// TODO: create a new file server instance (including a Shell) and start
 		// it
 		String fileserverdir = config.getString("fileserver.dir");
@@ -83,7 +121,6 @@ public class ComponentFactory {
 		int proxyudpport = config.getInt("proxy.udp.port");
 		int fileserverminalive = config.getInt("fileserver.alive");
 
-		return new Fileserver(fileserverdir, tcpport, proxyhost, proxyudpport,
-				fileserverminalive, shell);
+		return new Fileserver(fileserverdir, tcpport, proxyhost, proxyudpport, fileserverminalive, shell);
 	}
 }

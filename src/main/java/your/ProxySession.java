@@ -6,11 +6,20 @@ import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
+import java.security.PublicKey;
+import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
+import javax.crypto.Cipher;
+
+import org.bouncycastle.util.encoders.Base64;
+
+import message.LoginMessage2nd;
+import message.LoginMessage3rd;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
@@ -29,6 +38,10 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
 import model.DownloadTicket;
+import networkio.Base64Channel;
+import networkio.Channel;
+import networkio.RSAChannel;
+import networkio.TCPChannel;
 import proxy.IProxy;
 import util.ChecksumUtils;
 
@@ -37,6 +50,10 @@ public class ProxySession implements Runnable, IProxy {
 	private Socket socket;
 	private ObjectInputStream in;
 	private ObjectOutputStream out;
+	private Channel base_channel;
+	private Channel channel_in;
+	private Channel channel_out;
+
 	private UserDB users;
 
 	private User user = null;
@@ -53,9 +70,17 @@ public class ProxySession implements Runnable, IProxy {
 		this.users = parent.getUserDB();
 
 		try {
-			out = new ObjectOutputStream(socket.getOutputStream());
-			out.flush();
-			in = new ObjectInputStream(socket.getInputStream());
+			// out = new ObjectOutputStream(socket.getOutputStream());
+			// out.flush();
+			// in = new ObjectInputStream(socket.getInputStream());
+
+			out = null;
+			in = null;
+
+			base_channel = new Base64Channel(new TCPChannel(socket));
+			channel_in = new RSAChannel(base_channel, parent.getPrivKey(), Cipher.DECRYPT_MODE);
+			// channel_out = new RSAChannel(base_channel, parent.getPrivKey(),
+			// Cipher.ENCRYPT_MODE);
 
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
@@ -72,8 +97,8 @@ public class ProxySession implements Runnable, IProxy {
 		try {
 			while (true) {
 
-				Object o = in.readObject();
-				//System.out.println("incoming Request: " + o.getClass());
+				Object o = channel_in.read();
+				// System.out.println("incoming Request: " + o.getClass());
 
 				Object response = null;
 				if (hasArgument.contains(o.getClass())) {
@@ -81,13 +106,13 @@ public class ProxySession implements Runnable, IProxy {
 				} else {
 					response = commandMap.get(o.getClass()).invoke(this);
 				}
-				out.writeObject(response);
+				channel_out.write(response);
 
 			}
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
 		} catch (IOException e) {
-			//running = false;
+			// running = false;
 		} catch (IllegalAccessException e) {
 			e.printStackTrace();
 		} catch (IllegalArgumentException e) {
@@ -101,13 +126,42 @@ public class ProxySession implements Runnable, IProxy {
 
 	@Override
 	public LoginResponse login(LoginRequest lr) throws IOException {
+
 		User user = users.getUser(lr.getUsername());
-		if (user != null && user.hasPassword(lr.getPassword())) {
-			this.user = user;
-			return new LoginResponse(Type.SUCCESS);
-		} else {
+		PublicKey key = parent.getUserKey(lr.getUsername());
+		channel_out = new RSAChannel(base_channel, key, Cipher.ENCRYPT_MODE);
+
+		SecureRandom rand = new SecureRandom();
+		byte[] proxy_challenge = new byte[32];
+		byte[] iv = new byte[16];
+		byte[] sec_key = new byte[32];
+		rand.nextBytes(proxy_challenge);
+		rand.nextBytes(iv);
+		rand.nextBytes(sec_key);
+
+		LoginMessage2nd sec = new LoginMessage2nd(
+				Base64.encode(lr.getChallenge()), 
+				Base64.encode(proxy_challenge), 
+				Base64.encode(sec_key), 
+				Base64.encode(iv));
+		channel_out.write(sec);
+
+		try {
+			Object o = channel_in.read();
+			LoginMessage3rd resp = (LoginMessage3rd) o;
+			byte[] solved_challenge = Base64.decode(resp.getChallenge());
+
+			if (!Arrays.equals(solved_challenge, proxy_challenge))
+				return new LoginResponse(Type.WRONG_CREDENTIALS);
+
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
+
+		return new LoginResponse(Type.SUCCESS);
 	}
 
 	@Override
@@ -153,18 +207,15 @@ public class ProxySession implements Runnable, IProxy {
 		infoRequest.close();
 
 		if (infoResponseObj.getSize() < 0)
-			return new MessageResponse("File \"" + request.getFilename()
-					+ "\" does not exist");
-		
-		if(user.getCredits() < infoResponseObj.getSize())
+			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
+
+		if (user.getCredits() < infoResponseObj.getSize())
 			return new MessageResponse("Not enough Credits");
-		
 
-		String checksum = ChecksumUtils.generateChecksum(user.getName(),
-				request.getFilename(), 0, infoResponseObj.getSize());
+		String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), 0,
+				infoResponseObj.getSize());
 
-		DownloadTicket ticket = new DownloadTicket(user.getName(),
-				request.getFilename(), checksum,
+		DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
 				fileserver.getAddress(), fileserver.getTcpport());
 
 		user.addCredits(-infoResponseObj.getSize());
@@ -180,13 +231,11 @@ public class ProxySession implements Runnable, IProxy {
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
-		FileInfo info = new FileInfo(request.getFilename(),
-				request.getContent().length, request.getContent());
+		FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
 		parent.distributeFile(info);
 
 		user.addCredits(2 * request.getContent().length);
-		return new MessageResponse("File: " + info.getName()
-				+ " has been uploaded");
+		return new MessageResponse("File: " + info.getName() + " has been uploaded");
 	}
 
 	@Override
@@ -201,32 +250,24 @@ public class ProxySession implements Runnable, IProxy {
 
 	static {
 		try {
-			commandMap.put(LoginRequest.class,
-					ProxySession.class.getMethod("login", LoginRequest.class));
+			commandMap.put(LoginRequest.class, ProxySession.class.getMethod("login", LoginRequest.class));
 			hasArgument.add(LoginRequest.class);
 
-			commandMap.put(CreditsRequest.class,
-					ProxySession.class.getMethod("credits"));
-			
-			commandMap.put(LogoutRequest.class,
-					ProxySession.class.getMethod("logout"));
+			commandMap.put(CreditsRequest.class, ProxySession.class.getMethod("credits"));
 
-			commandMap.put(BuyRequest.class,
-					ProxySession.class.getMethod("buy", BuyRequest.class));
+			commandMap.put(LogoutRequest.class, ProxySession.class.getMethod("logout"));
+
+			commandMap.put(BuyRequest.class, ProxySession.class.getMethod("buy", BuyRequest.class));
 			hasArgument.add(BuyRequest.class);
 
-			commandMap.put(DownloadTicketRequest.class, ProxySession.class
-					.getMethod("download", DownloadTicketRequest.class));
+			commandMap.put(DownloadTicketRequest.class,
+					ProxySession.class.getMethod("download", DownloadTicketRequest.class));
 			hasArgument.add(DownloadTicketRequest.class);
 
-			commandMap
-					.put(UploadRequest.class, ProxySession.class.getMethod(
-							"upload", UploadRequest.class));
+			commandMap.put(UploadRequest.class, ProxySession.class.getMethod("upload", UploadRequest.class));
 			hasArgument.add(UploadRequest.class);
-			
-			commandMap
-			.put(ListRequest.class, ProxySession.class.getMethod(
-					"list"));
+
+			commandMap.put(ListRequest.class, ProxySession.class.getMethod("list"));
 
 		} catch (NoSuchMethodException e) {
 			e.printStackTrace();

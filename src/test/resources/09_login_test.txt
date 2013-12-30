@@ -1,0 +1,7 @@
+*	startProxy proxy
+
+*	startClient client
+client:	!login alice 12345
+client:	!exit
+proxy:	!exit
+

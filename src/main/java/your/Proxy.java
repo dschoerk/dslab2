@@ -1,11 +1,16 @@
 package your;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -35,6 +40,9 @@ import message.response.UserInfoResponse;
 import model.DownloadTicket;
 import model.FileServerInfo;
 import model.UserInfo;
+
+import org.bouncycastle.openssl.PEMReader;
+
 import proxy.IProxyCli;
 import util.ChecksumUtils;
 import util.ComponentFactory;
@@ -43,7 +51,6 @@ import cli.Command;
 import cli.Shell;
 
 public class Proxy implements IProxyCli, Runnable {
-
 
 	private ProxyUdpHandler udpHandler;
 	private ExecutorService threadpool;
@@ -57,23 +64,30 @@ public class Proxy implements IProxyCli, Runnable {
 	private UserDB users = new UserDB();
 	private Thread shellThread, connectionHandler, udpListenerThread;
 	private Timer fileserverOnlineTimer;
-	
+
 	private ProxyManagement managementComponent;
+
+	private PrivateKey privKey;
+	private File keyFolder;
 
 	public static void main(String[] args) throws Exception {
 
-		ComponentFactory factory = new ComponentFactory(); 
+		ComponentFactory factory = new ComponentFactory();
 		Shell shell = new Shell("Proxy", System.out, System.in);
 		Config cfg = new Config("proxy");
 		factory.startProxy(cfg, shell);
 	}
 
-	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, Shell shell) throws IOException {
+	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, File keyFolder, PrivateKey privKey,
+			Shell shell) throws IOException {
 		if (shell != null) {
 			shell.register(this);
 			shellThread = new Thread(shell);
 			shellThread.start();
 		}
+
+		this.privKey = privKey;
+		this.keyFolder = keyFolder;
 
 		knownFileservers = Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
 		sessions = Collections.synchronizedList(new ArrayList<ProxySession>());
@@ -100,7 +114,7 @@ public class Proxy implements IProxyCli, Runnable {
 
 		fileserverOnlineTimer = new Timer();
 		fileserverOnlineTimer.schedule(fsOnlineTask, 0, checkPeriod);
-		
+
 		managementComponent = new ProxyManagement();
 	}
 
@@ -189,7 +203,7 @@ public class Proxy implements IProxyCli, Runnable {
 				s.close();
 			}
 		}
-		
+
 		managementComponent.close();
 
 		System.in.close();
@@ -221,22 +235,20 @@ public class Proxy implements IProxyCli, Runnable {
 					synchronized (knownFileservers) {
 
 						MyFileServerInfo server = findServer(f);
-					//	System.out.println(server==null?"new server":"update "+server.Info());
-						
+						// System.out.println(server==null?"new server":"update "+server.Info());
+
 						if (server == null) { // new fileserver
 							server = f;
 							populateFiles(server);
 							knownFileservers.add(server);
-						}
-						else
-						{
+						} else {
 							if (!server.isOnline()) {
 								populateFiles(f);
 							}
 						}
-						
+
 						server.setAlive();
-						//server.updateOnlineStatus(3000);
+						// server.updateOnlineStatus(3000);
 					}
 				}
 			} catch (IOException e) {
@@ -256,8 +268,7 @@ public class Proxy implements IProxyCli, Runnable {
 		private void populateFiles(MyFileServerInfo f) throws IOException {
 			// Ask the new Fileserver what files he has
 			ListRequest reqObj = new ListRequest();
-			SimpleTcpRequest<Request, Response> req = new SimpleTcpRequest<Request, Response>(
-					f.createSocket());
+			SimpleTcpRequest<Request, Response> req = new SimpleTcpRequest<Request, Response>(f.createSocket());
 			req.writeRequest(reqObj);
 			ListResponse respObj = (ListResponse) req.waitForResponse();
 
@@ -281,13 +292,11 @@ public class Proxy implements IProxyCli, Runnable {
 				req.close();
 
 				req = new SimpleTcpRequest<Request, Response>(f.createSocket());
-				String checksum = ChecksumUtils.generateChecksum("", filename, 0,
-						infoResp.getSize());
+				String checksum = ChecksumUtils.generateChecksum("", filename, 0, infoResp.getSize());
 				DownloadTicket ticket = new DownloadTicket("", filename, checksum, null, 0);
 				DownloadFileRequest downloadObj = new DownloadFileRequest(ticket);
 				req.writeRequest(downloadObj);
-				DownloadFileResponse downloadResp = (DownloadFileResponse) req
-						.waitForResponse();
+				DownloadFileResponse downloadResp = (DownloadFileResponse) req.waitForResponse();
 				req.close();
 
 				FileInfo fileInfo = new FileInfo(filename, 0, downloadResp.getContent());
@@ -298,8 +307,7 @@ public class Proxy implements IProxyCli, Runnable {
 
 			for (String filename : filesWeUploadToServer) {
 				req = new SimpleTcpRequest<Request, Response>(f.createSocket());
-				UploadRequest uploadObj = new UploadRequest(filename, 0, knownFiles.get(
-						filename).getContent());
+				UploadRequest uploadObj = new UploadRequest(filename, 0, knownFiles.get(filename).getContent());
 				req.writeRequest(uploadObj);
 				MessageResponse uploadResp = (MessageResponse) req.waitForResponse();
 				req.close();
@@ -337,5 +345,27 @@ public class Proxy implements IProxyCli, Runnable {
 
 	public Map<String, FileInfo> getFiles() {
 		return knownFiles;
+	}
+
+	public PrivateKey getPrivKey() {
+		return privKey;
+	}
+
+	public PublicKey getUserKey(String username) {
+		for (File s : keyFolder.listFiles()) {
+			if (s.getName().equals(username+".pub.pem")) {
+				PEMReader in;
+				try {
+					in = new PEMReader(new FileReader(s));
+					return (PublicKey) in.readObject();
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		return null;
 	}
 }

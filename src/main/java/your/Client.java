@@ -3,21 +3,33 @@ package your;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.rmi.NotBoundException;
-import java.rmi.Remote;
-import java.rmi.registry.*;
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 import java.rmi.server.ExportException;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.AlgorithmParameterGenerator;
+import java.security.AlgorithmParameters;
+import java.security.Key;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.SecureRandom;
 
-import util.ComponentFactory;
-import util.Config;
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+
 import management.MessageInterface;
 import management.RMICallbackInterface;
+import message.LoginMessage2nd;
+import message.LoginMessage3rd;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
@@ -35,281 +47,360 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
 import model.DownloadTicket;
+import networkio.Base64Channel;
+import networkio.Channel;
+import networkio.RSAChannel;
+import networkio.TCPChannel;
+
+import org.bouncycastle.openssl.PEMReader;
+import org.bouncycastle.openssl.PasswordFinder;
+import org.bouncycastle.util.encoders.Base64;
+
+import util.Config;
 import cli.Command;
 import cli.Shell;
 import client.IClientCli;
 
 public class Client implements IClientCli, RMICallbackInterface {
 
-    private Socket socket;
-    private ObjectInputStream in;
-    private ObjectOutputStream out;
+	private Socket socket;
+	private Channel channel;
+	private Channel rsaChannelToProxy;
+	private Channel rsaChannelFromProxy;
+	private Channel aesChannel;
 
-    private File downloadDirectory;
+	private File downloadDirectory;
+	private File keyDir;
 
-    MessageInterface managementComponent;
+	MessageInterface managementComponent;
 
-    public static void main(String[] args) throws Exception {
-        ComponentFactory factory = new ComponentFactory();
-        Shell shell = new Shell("Client", System.out, System.in);
-        Config cfg = new Config("client");
-        factory.startClient(cfg, shell);
-    }
+	public static void main(String[] args) throws Exception {
 
-    public Client(File downloadDir, String host, int port, Shell shell) {
+		/*
+		 * ComponentFactory factory = new ComponentFactory(); Shell shell = new
+		 * Shell("Client", System.out, System.in); Config cfg = new
+		 * Config("client"); factory.startClient(cfg, shell);
+		 */
 
-        if (shell != null) {
-            shell.register(this);
-            Thread shellThread = new Thread(shell);
-            shellThread.start();
-        }
+		KeyGenerator gen = KeyGenerator.getInstance("AES");
+		gen.init(256);
+		SecretKey key = gen.generateKey();
 
-        this.downloadDirectory = downloadDir;
+		SecureRandom rand = new SecureRandom();
+		byte[] iv = new byte[16];
+		rand.nextBytes(iv);
 
-        try {
-            socket = new Socket(host, port);
+		Cipher cipher_enc = Cipher.getInstance("AES/CTR/NoPadding");
+		cipher_enc.init(Cipher.ENCRYPT_MODE, key, new IvParameterSpec(iv));
 
-            out = new ObjectOutputStream(socket.getOutputStream());
-            out.flush();
-            in = new ObjectInputStream(socket.getInputStream());
+		Cipher cipher_dec = Cipher.getInstance("AES/CTR/NoPadding");
+		cipher_dec.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
 
-            Config cfg_mc = new Config("mc");
-            Registry registry = LocateRegistry.getRegistry(
-                    cfg_mc.getString("proxy.host"),
-                    cfg_mc.getInt("proxy.rmi.port"));
+		String message = "asdf";
 
-            managementComponent = (MessageInterface) registry.lookup("Proxy");
+		byte[] dec = cipher_enc.doFinal(message.getBytes());
+		System.out.println(new String(cipher_dec.doFinal(dec)));
+	}
 
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        } catch (NotBoundException e) {
-            // TODO Auto-generated catch block
-            System.out.println("Proxy RMI not registered");
-            e.printStackTrace();
-        }
-    }
+	public Client(File downloadDir, String host, int port, PublicKey pubk, File keyDir, Shell shell) {
 
-    @Command
-    @Override
-    public LoginResponse login(String username, String password)
-            throws IOException {
+		if (shell != null) {
+			shell.register(this);
+			Thread shellThread = new Thread(shell);
+			shellThread.start();
+		}
 
-        LoginRequest message = new LoginRequest(username, password);
+		this.downloadDirectory = downloadDir;
+		this.keyDir = keyDir;
 
-        Object response;
-        try {
-            out.writeObject(message);
-            response = (Response) in.readObject();
-            LoginResponse loginresponse = (LoginResponse) response;
-            return loginresponse;
+		try {
+			socket = new Socket(host, port);
+			channel = new Base64Channel(new TCPChannel(socket));
+			rsaChannelToProxy = new RSAChannel(channel, pubk, Cipher.ENCRYPT_MODE);
+			// out = new ObjectOutputStream(socket.getOutputStream());
+			// out.flush();
+			// in = new ObjectInputStream(socket.getInputStream());
 
-        } catch (ClassNotFoundException e) {
-            e.printStackTrace();
-            return new LoginResponse(Type.WRONG_CREDENTIALS);
-        } catch (SocketException e) {
-            return new LoginResponse(Type.WRONG_CREDENTIALS);
-        }
-    }
+			Config cfg_mc = new Config("mc");
+			Registry registry = LocateRegistry.getRegistry(cfg_mc.getString("proxy.host"),
+					cfg_mc.getInt("proxy.rmi.port"));
 
-    @Command
-    @Override
-    public Response credits() throws IOException {
+			managementComponent = (MessageInterface) registry.lookup("Proxy");
 
-        CreditsRequest message = new CreditsRequest();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (NotBoundException e) {
+			// TODO Auto-generated catch block
+			System.out.println("Proxy RMI not registered");
+			e.printStackTrace();
+		}
+	}
 
-        Response response;
-        try {
-            out.writeObject(message);
-            response = (Response) in.readObject();
+	private PrivateKey getUserKey(String username) {
+		System.out.println(keyDir.listFiles().length);
+		for (File s : keyDir.listFiles()) {
+			if (s.getName().equals(username+".pem")) {
+				System.out.println("found");
+				try {
+					PEMReader in = new PEMReader(new FileReader(s.getAbsolutePath()), new PasswordFinder() {
+						@Override
+						public char[] getPassword() {
+							try {
+								char[] a = new char[] { '1', '2', '3', '4', '5' };
+								return a;
+							} catch (Exception e) {
+								e.printStackTrace();
+							}
+							return null;
+						}
+					});
 
-            if (response instanceof MessageResponse) {
-                return response;
-            }
+					KeyPair keyPair = (KeyPair) in.readObject();
+					PrivateKey privKey = keyPair.getPrivate();
+					in.close();
+					return privKey;
+					
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
 
-            CreditsResponse credits = (CreditsResponse) response;
-            return new MessageResponse("You have " + credits.getCredits()
-                    + " left!");
+		return null;
+	}
 
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Failed Credits Request");
-        } catch (SocketException e) {
-            return new MessageResponse("Lost Connection");
-        }
-    }
+	@Command
+	@Override
+	public LoginResponse login(String username, String password) throws IOException {
 
-    @Command
-    @Override
-    public Response buy(long credits) throws IOException {
-        BuyRequest message = new BuyRequest(credits);
+		Key privk = getUserKey(username); // read private key for username
+		rsaChannelFromProxy = new RSAChannel(channel, privk, Cipher.DECRYPT_MODE);
 
-        Object response;
-        try {
-            out.writeObject(message);
-            response = (Response) in.readObject();
-            BuyResponse buyresponse = (BuyResponse) response;
-            return new MessageResponse("You now have "
-                    + buyresponse.getCredits() + "!");
+		SecureRandom rand = new SecureRandom();
+		byte[] client_challenge = new byte[32];
+		rand.nextBytes(client_challenge);
+		client_challenge = Base64.encode(client_challenge);
 
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Failed Buy Request");
-        } catch (SocketException e) {
-            return new MessageResponse("Lost Connection");
-        }
-    }
+		LoginRequest message = new LoginRequest(username, client_challenge);
 
-    @Command
-    @Override
-    public Response list() throws IOException {
+		Object response;
+		try {
+			rsaChannelToProxy.write(message);
+			response = (LoginMessage2nd) rsaChannelFromProxy.read();
+			LoginMessage2nd msg_2nd = (LoginMessage2nd) response;
+			
+			LoginMessage3rd msg_3rd = new LoginMessage3rd(msg_2nd.getProxyChallenge());
+			rsaChannelToProxy.write(msg_3rd);
+			
+			response = rsaChannelFromProxy.read();
+			LoginResponse loginresponse = (LoginResponse) response;
+			return loginresponse;
 
-        ListRequest req = new ListRequest();
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+		} catch (SocketException e) {
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+		}
+	}
 
-        Response response;
-        try {
-            out.writeObject(req);
-            response = (Response) in.readObject();
-            return response;
+	@Command
+	@Override
+	public Response credits() throws IOException {
 
-        } catch (ClassNotFoundException e) {
-            // may not happen
-            e.printStackTrace();
-        } catch (SocketException e) {
-            return new MessageResponse("Lost Connection");
-        }
-        return new MessageResponse("Error while reading Files");
-    }
+		CreditsRequest message = new CreditsRequest();
 
-    @Command
-    @Override
-    public Response download(String filename) throws IOException {
+		Response response = null;
+		try {
+			channel.write(message);
+			response = (Response) channel.read();
 
-        DownloadTicketRequest message = new DownloadTicketRequest(filename);
-        Object response;
-        try {
-            out.writeObject(message);
-            response = (Response) in.readObject();
+			if (response instanceof MessageResponse) {
+				return response;
+			}
 
-            if (response instanceof MessageResponse) {
-                return (Response) response;
-            }
+			CreditsResponse credits = (CreditsResponse) response;
+			return new MessageResponse("You have " + credits.getCredits() + " left!");
 
-            DownloadTicketResponse ticketResponse = (DownloadTicketResponse) response;
-            DownloadTicket ticket = ticketResponse.getTicket();
+		} catch (ClassNotFoundException e) {
+			throw new IOException("Failed Credits Request");
+		} catch (SocketException e) {
+			return new MessageResponse("Lost Connection");
+		}
+	}
 
-            Socket s = new Socket(ticket.getAddress(), ticket.getPort());
-            SimpleTcpRequest<DownloadFileRequest, Response> req = new SimpleTcpRequest<DownloadFileRequest, Response>(
-                    s);
-            req.writeRequest(new DownloadFileRequest(ticket));
-            Response downloadResponse = req.waitForResponse();
+	@Command
+	@Override
+	public Response buy(long credits) throws IOException {
+		BuyRequest message = new BuyRequest(credits);
 
-            if (downloadResponse instanceof MessageResponse) {
-                return (Response) downloadResponse;
-            }
-            DownloadFileResponse downloadResponseCasted = (DownloadFileResponse) downloadResponse;
+		Object response;
+		try {
+			channel.write(message);
+			response = (Response) channel.read();
+			BuyResponse buyresponse = (BuyResponse) response;
+			return new MessageResponse("You now have " + buyresponse.getCredits() + "!");
 
-            return downloadResponseCasted;
+		} catch (ClassNotFoundException e) {
+			throw new IOException("Failed Buy Request");
+		} catch (SocketException e) {
+			return new MessageResponse("Lost Connection");
+		}
+	}
 
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Failed Buy Request");
-        } catch (SocketException e) {
-            return new MessageResponse("Lost Connection");
-        }
-    }
+	@Command
+	@Override
+	public Response list() throws IOException {
 
-    @Command
-    @Override
-    public MessageResponse upload(String filename) throws IOException {
-        File f = new File(downloadDirectory.getAbsolutePath() + "/" + filename);
-        if (!f.exists())
-            return new MessageResponse("file does not exist");
+		ListRequest req = new ListRequest();
 
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        FileIo.copy(new FileInputStream(f.getPath()), baos, 128);
-        byte[] data = baos.toByteArray();
+		Response response;
+		try {
+			channel.write(req);
+			response = (Response) channel.read();
+			return response;
 
-        UploadRequest upload = new UploadRequest(filename, 0, data);
+		} catch (ClassNotFoundException e) {
+			// may not happen
+			e.printStackTrace();
+		} catch (SocketException e) {
+			return new MessageResponse("Lost Connection");
+		}
+		return new MessageResponse("Error while reading Files");
+	}
 
-        Object response;
-        try {
-            out.writeObject(upload);
-            response = (Response) in.readObject();
-            MessageResponse uploadresponse = (MessageResponse) response;
-            return uploadresponse;
+	@Command
+	@Override
+	public Response download(String filename) throws IOException {
 
-        } catch (ClassNotFoundException e) {
-            throw new IOException("Failed Buy Request");
-        } catch (SocketException e) {
-            return new MessageResponse("Lost Connection");
-        }
-    }
+		DownloadTicketRequest message = new DownloadTicketRequest(filename);
+		Object response;
+		try {
+			channel.write(message);
+			response = (Response) channel.read();
 
-    @Command
-    @Override
-    public MessageResponse logout() throws IOException {
-        LogoutRequest message = new LogoutRequest();
-        out.writeObject(message);
+			if (response instanceof MessageResponse) {
+				return (Response) response;
+			}
 
-        return new MessageResponse("Successfully logged out.");
-    }
+			DownloadTicketResponse ticketResponse = (DownloadTicketResponse) response;
+			DownloadTicket ticket = ticketResponse.getTicket();
 
-    @Command
-    public MessageResponse readQuorum() throws IOException {
+			Socket s = new Socket(ticket.getAddress(), ticket.getPort());
+			SimpleTcpRequest<DownloadFileRequest, Response> req = new SimpleTcpRequest<DownloadFileRequest, Response>(s);
+			req.writeRequest(new DownloadFileRequest(ticket));
+			Response downloadResponse = req.waitForResponse();
 
-        return new MessageResponse("" + managementComponent.getReadQuorum());
-    }
+			if (downloadResponse instanceof MessageResponse) {
+				return (Response) downloadResponse;
+			}
+			DownloadFileResponse downloadResponseCasted = (DownloadFileResponse) downloadResponse;
 
-    @Command
-    public MessageResponse writeQuorum() throws IOException {
+			return downloadResponseCasted;
 
-        return new MessageResponse("" + managementComponent.getWriteQuorum());
-    }
+		} catch (ClassNotFoundException e) {
+			throw new IOException("Failed Buy Request");
+		} catch (SocketException e) {
+			return new MessageResponse("Lost Connection");
+		}
+	}
 
-    @Command
-    public MessageResponse topThreeDownloads() throws IOException {
+	@Command
+	@Override
+	public MessageResponse upload(String filename) throws IOException {
+		File f = new File(downloadDirectory.getAbsolutePath() + "/" + filename);
+		if (!f.exists())
+			return new MessageResponse("file does not exist");
 
-        return new MessageResponse("TODO: IMPLEMENT!!!");
-    }
+		ByteArrayOutputStream baos = new ByteArrayOutputStream();
+		FileIo.copy(new FileInputStream(f.getPath()), baos, 128);
+		byte[] data = baos.toByteArray();
 
-    @Command
-    public MessageResponse subscribe(String file, int trigger)
-            throws IOException {
-        try {
-            UnicastRemoteObject.exportObject(this, 0);
-        } catch (ExportException E) {
-            System.out.println("reexport");
-        }
-        RMICallbackInterface callback = (RMICallbackInterface) this;
-        managementComponent.subscribe(callback,"", file, trigger);
-        return new MessageResponse("Successfully subscribed for file: " + file);
-    }
+		UploadRequest upload = new UploadRequest(filename, 0, data);
 
-    @Command
-    public MessageResponse getProxyPublicKey() throws IOException {
+		Object response;
+		try {
+			channel.write(upload);
+			response = (Response) channel.read();
+			MessageResponse uploadresponse = (MessageResponse) response;
+			return uploadresponse;
 
-        return new MessageResponse("TODO: IMPLEMENT!!!");
-    }
+		} catch (ClassNotFoundException e) {
+			throw new IOException("Failed Buy Request");
+		} catch (SocketException e) {
+			return new MessageResponse("Lost Connection");
+		}
+	}
 
-    @Command
-    public MessageResponse setUserPublicKey(String user) throws IOException {
+	@Command
+	@Override
+	public MessageResponse logout() throws IOException {
+		LogoutRequest message = new LogoutRequest();
+		channel.write(message);
 
-        return new MessageResponse("TODO: IMPLEMENT!!!");
-    }
+		return new MessageResponse("Successfully logged out.");
+	}
 
-    @Command
-    @Override
-    public MessageResponse exit() throws IOException {
-        socket.close();
-        System.in.close();
-        try {
-            UnicastRemoteObject.unexportObject(this, true);
-        } catch (Exception e) {
-        }
-        return null;
-    }
+	@Command
+	public MessageResponse readQuorum() throws IOException {
 
-    @Override
-    public void notifySubscriber(String file, int trigger) {
-        System.out.println("notify!!!");
+		return new MessageResponse("" + managementComponent.getReadQuorum());
+	}
 
-    }
+	@Command
+	public MessageResponse writeQuorum() throws IOException {
+
+		return new MessageResponse("" + managementComponent.getWriteQuorum());
+	}
+
+	@Command
+	public MessageResponse topThreeDownloads() throws IOException {
+
+		return new MessageResponse("TODO: IMPLEMENT!!!");
+	}
+
+	@Command
+	public MessageResponse subscribe(String file, int trigger) throws IOException {
+		try {
+			UnicastRemoteObject.exportObject(this, 0);
+		} catch (ExportException E) {
+			System.out.println("reexport");
+		}
+		RMICallbackInterface callback = (RMICallbackInterface) this;
+		managementComponent.subscribe(callback, "", file, trigger);
+		return new MessageResponse("Successfully subscribed for file: " + file);
+	}
+
+	@Command
+	public MessageResponse getProxyPublicKey() throws IOException {
+
+		return new MessageResponse("TODO: IMPLEMENT!!!");
+	}
+
+	@Command
+	public MessageResponse setUserPublicKey(String user) throws IOException {
+
+		return new MessageResponse("TODO: IMPLEMENT!!!");
+	}
+
+	@Command
+	@Override
+	public MessageResponse exit() throws IOException {
+		socket.close();
+		System.in.close();
+		try {
+			UnicastRemoteObject.unexportObject(this, true);
+		} catch (Exception e) {
+		}
+		return null;
+	}
+
+	@Override
+	public void notifySubscriber(String file, int trigger) {
+		System.out.println("notify!!!");
+
+	}
 }

@@ -11,30 +11,37 @@ import message.Request;
  * {@code !login success}<br/>
  * or<br/>
  * {@code !login wrong_credentials}
- *
+ * 
  * @see message.response.LoginResponse
  */
 public class LoginRequest implements Request {
 	private static final long serialVersionUID = -1596776158259072949L;
 
 	private final String username;
-	private final String password;
+	private byte[] challenge;
 
-	public LoginRequest(String username, String password) {
+	// private final String password;
+
+	public LoginRequest(String username, byte[] challenge/* , String password */) {
 		this.username = username;
-		this.password = password;
+		// this.password = password;
+		this.challenge = challenge;
 	}
 
 	public String getUsername() {
 		return username;
 	}
 
-	public String getPassword() {
-		return password;
+	public byte[] getChallenge() {
+		return challenge;
 	}
+
+	// public String getPassword() {
+	// return password;
+	// }
 
 	@Override
 	public String toString() {
-		return String.format("!login %s %s", getUsername(), getPassword());
+		return String.format("!login %s %s", getUsername()/* , getPassword() */);
 	}
 }
