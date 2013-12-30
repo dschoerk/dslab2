@@ -6,6 +6,7 @@ import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
+import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -15,8 +16,8 @@ import java.util.Map;
 import java.util.Set;
 
 import javax.crypto.Cipher;
-
-import org.bouncycastle.util.encoders.Base64;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
 
 import message.LoginMessage2nd;
 import message.LoginMessage3rd;
@@ -38,10 +39,14 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
 import model.DownloadTicket;
+import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
 import networkio.RSAChannel;
 import networkio.TCPChannel;
+
+import org.bouncycastle.util.encoders.Base64;
+
 import proxy.IProxy;
 import util.ChecksumUtils;
 
@@ -134,17 +139,34 @@ public class ProxySession implements Runnable, IProxy {
 		SecureRandom rand = new SecureRandom();
 		byte[] proxy_challenge = new byte[32];
 		byte[] iv = new byte[16];
-		byte[] sec_key = new byte[32];
+		
+		KeyGenerator gen;
+		SecretKey sec_key = null;
+		try {
+			gen = KeyGenerator.getInstance("AES");
+			gen.init(256);
+			sec_key = gen.generateKey();
+			
+		} catch (NoSuchAlgorithmException e1) {
+			// may not happen
+			e1.printStackTrace();
+		} 
+		
+		
+		//byte[] sec_key = new byte[32];
 		rand.nextBytes(proxy_challenge);
 		rand.nextBytes(iv);
-		rand.nextBytes(sec_key);
+		//rand.nextBytes(sec_key);
 
 		LoginMessage2nd sec = new LoginMessage2nd(
 				Base64.encode(lr.getChallenge()), 
 				Base64.encode(proxy_challenge), 
-				Base64.encode(sec_key), 
+				Base64.encode(sec_key.getEncoded()), 
 				Base64.encode(iv));
 		channel_out.write(sec);
+		
+		channel_in = new AESChannel(base_channel, sec_key, iv);
+		channel_out = channel_in;
 
 		try {
 			Object o = channel_in.read();
@@ -161,6 +183,7 @@ public class ProxySession implements Runnable, IProxy {
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
 
+		this.user = user;
 		return new LoginResponse(Type.SUCCESS);
 	}
 

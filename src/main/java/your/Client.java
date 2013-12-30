@@ -6,8 +6,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.rmi.NotBoundException;
@@ -23,9 +21,8 @@ import java.security.SecureRandom;
 import java.util.List;
 
 import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 import management.MessageInterface;
 import management.RMICallbackInterface;
@@ -48,6 +45,7 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
 import model.DownloadTicket;
+import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
 import networkio.RSAChannel;
@@ -192,11 +190,16 @@ public class Client implements IClientCli, RMICallbackInterface {
 			rsaChannelToProxy.write(message);
 			response = (LoginMessage2nd) rsaChannelFromProxy.read();
 			LoginMessage2nd msg_2nd = (LoginMessage2nd) response;
+			
+			byte [] key = Base64.decode(msg_2nd.getSecretKey());
+			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
+			byte [] iv = Base64.decode(msg_2nd.getIV());
+			channel = new AESChannel(channel, originalKey, iv);
 
 			LoginMessage3rd msg_3rd = new LoginMessage3rd(msg_2nd.getProxyChallenge());
-			rsaChannelToProxy.write(msg_3rd);
+			channel.write(msg_3rd);
 
-			response = rsaChannelFromProxy.read();
+			response = channel.read();
 			LoginResponse loginresponse = (LoginResponse) response;
 			return loginresponse;
 

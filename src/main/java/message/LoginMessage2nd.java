@@ -1,6 +1,7 @@
 package message;
 
 import java.io.Serializable;
+import java.security.Key;
 
 public class LoginMessage2nd implements Serializable {
 
