@@ -170,7 +170,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
 			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
 			byte[] iv = Base64.decode(msg_2nd.getIV());
-			channel = channel;//new AESChannel(channel, originalKey, iv);
+			channel = new AESChannel(channel, originalKey, iv);
 
 			LoginMessageFinal msg_3rd = new LoginMessageFinal(msg_2nd.getProxyChallenge());
 			channel.write(msg_3rd);
@@ -261,10 +261,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 		DownloadTicketRequest message = new DownloadTicketRequest(filename);
 		Object response = null;
 		try {
-			System.out.println(socket.isClosed());
 			channel.write(message);
 			response = (Response) channel.read();
-			System.out.println("download");
 
 			if (response instanceof MessageResponse) {
 				return (Response) response;

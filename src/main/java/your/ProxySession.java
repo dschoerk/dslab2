@@ -37,6 +37,7 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
 import model.DownloadTicket;
+import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
 import networkio.RSAChannel;
@@ -153,7 +154,7 @@ public class ProxySession implements Runnable, IProxy {
 				Base64.encode(iv));
 		channel_out.write(sec);
 		
-		channel_in = base_channel;//new AESChannel(base_channel, sec_key, iv);
+		channel_in = new AESChannel(base_channel, sec_key, iv);
 		channel_out = channel_in;
 
 		try {
@@ -205,7 +206,6 @@ public class ProxySession implements Runnable, IProxy {
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
 		
-		System.out.println("proxy got download request");
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
