@@ -26,8 +26,8 @@ import javax.crypto.spec.SecretKeySpec;
 
 import management.MessageInterface;
 import management.RMICallbackInterface;
-import message.LoginMessage2nd;
-import message.LoginMessage3rd;
+import message.LoginMessageOk;
+import message.LoginMessageFinal;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
@@ -164,15 +164,15 @@ public class Client implements IClientCli, RMICallbackInterface {
 		Object response;
 		try {
 			rsaChannelToProxy.write(message);
-			response = (LoginMessage2nd) rsaChannelFromProxy.read();
-			LoginMessage2nd msg_2nd = (LoginMessage2nd) response;
+			response = (LoginMessageOk) rsaChannelFromProxy.read();
+			LoginMessageOk msg_2nd = (LoginMessageOk) response;
 
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
 			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
 			byte[] iv = Base64.decode(msg_2nd.getIV());
 			channel = new AESChannel(channel, originalKey, iv);
 
-			LoginMessage3rd msg_3rd = new LoginMessage3rd(msg_2nd.getProxyChallenge());
+			LoginMessageFinal msg_3rd = new LoginMessageFinal(msg_2nd.getProxyChallenge());
 			channel.write(msg_3rd);
 
 			response = channel.read();

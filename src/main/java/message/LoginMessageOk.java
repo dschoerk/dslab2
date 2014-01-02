@@ -3,7 +3,7 @@ package message;
 import java.io.Serializable;
 import java.security.Key;
 
-public class LoginMessage2nd implements Serializable {
+public class LoginMessageOk implements Serializable {
 
 	/**
 	 * 
@@ -14,7 +14,7 @@ public class LoginMessage2nd implements Serializable {
 	private byte[] secret_key;
 	private byte[] iv;
 
-	public LoginMessage2nd(byte[] client_challenge, byte[] proxy_challenge, byte[] secret_key, byte[] iv) {
+	public LoginMessageOk(byte[] client_challenge, byte[] proxy_challenge, byte[] secret_key, byte[] iv) {
 		this.client_challenge = client_challenge;
 		this.proxy_challenge = proxy_challenge;
 		this.secret_key = secret_key;

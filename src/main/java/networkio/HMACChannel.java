@@ -12,11 +12,10 @@ public class HMACChannel extends Channel {
 
 	private Channel parent;
 	private Mac hMac;
-	
+
 	private boolean correctChecksum;
-	
-	public HMACChannel(Channel parent, SecretKey key)
-	{
+
+	public HMACChannel(Channel parent, SecretKey key) {
 		this.parent = parent;
 		try {
 			hMac = Mac.getInstance("HmacSHA256");
@@ -29,32 +28,31 @@ public class HMACChannel extends Channel {
 			e.printStackTrace();
 		}
 	}
-	
+
 	@Override
 	public void write(byte[] data) throws IOException {
-		
-		byte [] checksum = hMac.doFinal(data); 
+
+		byte[] checksum = hMac.doFinal(data);
 		parent.write(checksum);
 		parent.write(data);
 	}
 
 	@Override
 	public byte[] readBytes() throws ClassNotFoundException, IOException {
-		
-		byte [] data = parent.readBytes();
-		byte [] sentChecksum = parent.readBytes();
+
+		byte[] data = parent.readBytes();
+		byte[] sentChecksum = parent.readBytes();
 		correctChecksum = MessageDigest.isEqual(sentChecksum, hMac.doFinal(data));
 		return data;
 	}
-	
-	public boolean isChecksumCorrect()
-	{
+
+	public boolean isChecksumCorrect() {
 		return correctChecksum;
 	}
 
 	@Override
 	public void close() throws IOException {
-		
+		parent.close();
 	}
 
 }

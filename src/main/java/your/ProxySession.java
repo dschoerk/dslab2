@@ -19,8 +19,8 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 
-import message.LoginMessage2nd;
-import message.LoginMessage3rd;
+import message.LoginMessageOk;
+import message.LoginMessageFinal;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
@@ -158,7 +158,7 @@ public class ProxySession implements Runnable, IProxy {
 		rand.nextBytes(iv);
 		//rand.nextBytes(sec_key);
 
-		LoginMessage2nd sec = new LoginMessage2nd(
+		LoginMessageOk sec = new LoginMessageOk(
 				Base64.encode(lr.getChallenge()), 
 				Base64.encode(proxy_challenge), 
 				Base64.encode(sec_key.getEncoded()), 
@@ -170,7 +170,7 @@ public class ProxySession implements Runnable, IProxy {
 
 		try {
 			Object o = channel_in.read();
-			LoginMessage3rd resp = (LoginMessage3rd) o;
+			LoginMessageFinal resp = (LoginMessageFinal) o;
 			byte[] solved_challenge = Base64.decode(resp.getChallenge());
 
 			if (!Arrays.equals(solved_challenge, proxy_challenge))
