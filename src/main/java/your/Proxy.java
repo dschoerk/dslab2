@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -310,7 +311,7 @@ public class Proxy implements IProxyCli, Runnable {
 				req.close();
 
 				FileInfo fileInfo = new FileInfo(filename, 0, downloadResp.getContent());
-				distributeFile(fileInfo);
+				//distributeFile(fileInfo,0);
 
 				knownFiles.put(filename, fileInfo);
 			}
@@ -331,17 +332,14 @@ public class Proxy implements IProxyCli, Runnable {
 		return MyFileServerInfo.minimumUsage(knownFileservers);
 	}
 
-	public void distributeFile(FileInfo info) {
+	public void distributeFile(ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum, FileInfo info, int version) {
 
-		for (MyFileServerInfo server : knownFileservers) {
-
-			if (!server.isOnline())
-				continue;
+		for (MyFileServerInfo server : writeQuorum.values()) {
 
 			try {
 				Socket s = server.createSocket();
 				Channel req = new TCPChannel(s);
-				UploadRequest requestObj = new UploadRequest(info.getName(), 0, info.getContent());
+				UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
 				req.write(requestObj);
 				MessageResponse responseObj = (MessageResponse)req.read();
 				s.close();
@@ -385,4 +383,16 @@ public class Proxy implements IProxyCli, Runnable {
 	public ProxyManagement getManagementComonent(){
 	    return managementComponent;
 	}
+	public HashMap<MyFileServerInfo, Long> getOnlineServer()
+	{
+		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
+
+		for (MyFileServerInfo server : knownFileservers) 
+
+			if (!server.isOnline())
+			{
+				onlineservers.put(server, server.getUsage());
+			}
+			return onlineservers;
+		}
 }

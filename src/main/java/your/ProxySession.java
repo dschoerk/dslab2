@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -28,6 +29,7 @@ import message.request.ListRequest;
 import message.request.LoginRequest;
 import message.request.LogoutRequest;
 import message.request.UploadRequest;
+import message.request.VersionRequest;
 import message.response.BuyResponse;
 import message.response.CreditsResponse;
 import message.response.DownloadTicketResponse;
@@ -36,6 +38,7 @@ import message.response.ListResponse;
 import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
+import message.response.VersionResponse;
 import model.DownloadTicket;
 import networkio.AESChannel;
 import networkio.Base64Channel;
@@ -54,6 +57,8 @@ public class ProxySession implements Runnable, IProxy {
 	private Channel base_channel;
 	private Channel channel_in;
 	private Channel channel_out;
+	private int NumberNR;
+	private int NumberNW;
 
 	private UserDB users;
 
@@ -255,12 +260,35 @@ public class ProxySession implements Runnable, IProxy {
 	@Override
 	public MessageResponse upload(UploadRequest request) throws IOException {
 
+		
 		if (user == null)
 			return new MessageResponse("You have to login first");
-
+		
+		NumberNR=Math.round(parent.getOnlineServer().size()/2);
+		NumberNW=Math.round(parent.getOnlineServer().size()/2)+1;
+		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getReadQuorum();
+		ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum=getWriteQuorum();
+		int version=-2;
+		for (MyFileServerInfo server : readQuorum.values()) 
+		{
+			try {
+				version=Math.max(getFileVersionNumber(server,request.getFilename()), version);
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		 System.out.println("Version before " + version);
+		if(version!=-1)
+		{
+			version++;
+		}
+		else{
+			version=1;
+		}
+		System.out.println("Version after " + version);
 		FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
-		parent.distributeFile(info);
-
+		parent.distributeFile(writeQuorum,info,version);
 		user.addCredits(2 * request.getContent().length);
 		return new MessageResponse("File: " + info.getName() + " has been uploaded");
 	}
@@ -274,6 +302,50 @@ public class ProxySession implements Runnable, IProxy {
 
 	public User getUser() {
 		return user;
+	}
+	
+	private ConcurrentHashMap<Long, MyFileServerInfo> getReadQuorum()
+	{
+		ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
+
+		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
+		{	
+			int i=0;
+			while(i<NumberNR)
+			{
+				readQuorum.put(server.getUsage(), server);
+				i++;
+			}
+		}
+		return readQuorum;
+	}
+	
+	
+	private ConcurrentHashMap<Long, MyFileServerInfo> getWriteQuorum()
+	{
+		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
+
+		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
+		{	
+			int i=0;
+			while(i<NumberNW)
+			{
+				writeQuorum.put(server.getUsage(), server);
+				i++;
+			}
+		}
+		return writeQuorum;
+	}
+	
+	private int getFileVersionNumber(MyFileServerInfo server, String filename) throws IOException, ClassNotFoundException
+	{
+		TCPChannel versionRequest = new TCPChannel(	server.createSocket());
+		VersionRequest versionRequestObj = new VersionRequest(filename);
+		versionRequest.write(versionRequestObj);
+		VersionResponse versionResponseObj = (VersionResponse) versionRequest.read();
+		versionRequest.close();
+			
+		return versionResponseObj.getVersion();
 	}
 
 	static {
