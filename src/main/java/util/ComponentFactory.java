@@ -77,21 +77,17 @@ public class ComponentFactory {
 		String keydir = config.getString("keys.dir");
 
 		String pathtoprivkey = config.getString("key");
-		System.out.println(pathtoprivkey);
-		PEMReader in = new PEMReader(new FileReader(pathtoprivkey), new PasswordFinder() {
 
+		PEMReader in = new PEMReader(new FileReader(pathtoprivkey), new PasswordFinder() {
 			@Override
 			public char[] getPassword() {
-				// return
 				try {
-
 					// char [] a = new BufferedReader(new
 					// InputStreamReader(System.in)).readLine().toCharArray();
 					char[] a = new char[] { '1', '2', '3', '4', '5' };
 
 					return a;
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
 				return null;

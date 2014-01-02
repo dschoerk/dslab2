@@ -26,7 +26,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import management.ProxyManagement;
-import message.Request;
 import message.Response;
 import message.request.DownloadFileRequest;
 import message.request.InfoRequest;
@@ -41,6 +40,7 @@ import message.response.UserInfoResponse;
 import model.DownloadTicket;
 import model.FileServerInfo;
 import model.UserInfo;
+import networkio.Channel;
 import networkio.TCPChannel;
 
 import org.bouncycastle.openssl.PEMReader;
@@ -340,14 +340,16 @@ public class Proxy implements IProxyCli, Runnable {
 
 			try {
 				Socket s = server.createSocket();
-				SimpleTcpRequest<UploadRequest, MessageResponse> req = new SimpleTcpRequest<UploadRequest, MessageResponse>(
-						s);
+				Channel req = new TCPChannel(s);
 				UploadRequest requestObj = new UploadRequest(info.getName(), 0, info.getContent());
-				req.writeRequest(requestObj);
-				MessageResponse responseObj = req.waitForResponse();
-				req.close();
+				req.write(requestObj);
+				MessageResponse responseObj = (MessageResponse)req.read();
+				s.close();
 
 			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}

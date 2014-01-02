@@ -18,6 +18,8 @@ public class TCPChannel extends Channel {
 	@Override
 	public byte[] readBytes() throws ClassNotFoundException, IOException {
 		int size = is.readInt();
+		assert size > 0;
+		
 		byte [] buffer = new byte[size];
 		is.read(buffer);
 		return buffer;

@@ -1,8 +1,6 @@
 package your;
 
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
@@ -19,8 +17,8 @@ import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 
-import message.LoginMessageOk;
 import message.LoginMessageFinal;
+import message.LoginMessageOk;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
@@ -39,7 +37,6 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageResponse;
 import model.DownloadTicket;
-import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
 import networkio.RSAChannel;
@@ -53,8 +50,6 @@ import util.ChecksumUtils;
 public class ProxySession implements Runnable, IProxy {
 
 	private Socket socket;
-	private ObjectInputStream in;
-	private ObjectOutputStream out;
 	private Channel base_channel;
 	private Channel channel_in;
 	private Channel channel_out;
@@ -75,13 +70,6 @@ public class ProxySession implements Runnable, IProxy {
 		this.users = parent.getUserDB();
 
 		try {
-			// out = new ObjectOutputStream(socket.getOutputStream());
-			// out.flush();
-			// in = new ObjectInputStream(socket.getInputStream());
-
-			out = null;
-			in = null;
-
 			base_channel = new Base64Channel(new TCPChannel(socket));
 			channel_in = new RSAChannel(base_channel, parent.getPrivKey(), Cipher.DECRYPT_MODE);
 			// channel_out = new RSAChannel(base_channel, parent.getPrivKey(),
@@ -165,7 +153,7 @@ public class ProxySession implements Runnable, IProxy {
 				Base64.encode(iv));
 		channel_out.write(sec);
 		
-		channel_in = new AESChannel(base_channel, sec_key, iv);
+		channel_in = base_channel;//new AESChannel(base_channel, sec_key, iv);
 		channel_out = channel_in;
 
 		try {
@@ -216,6 +204,8 @@ public class ProxySession implements Runnable, IProxy {
 
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
+		
+		System.out.println("proxy got download request");
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
@@ -224,12 +214,18 @@ public class ProxySession implements Runnable, IProxy {
 		if (fileserver == null)
 			return new MessageResponse("No Fileserver available");
 
-		SimpleTcpRequest<InfoRequest, InfoResponse> infoRequest = new SimpleTcpRequest<InfoRequest, InfoResponse>(
-				fileserver.createSocket());
+		Socket s = fileserver.createSocket();
 		InfoRequest infoRequestObj = new InfoRequest(request.getFilename());
-		infoRequest.writeRequest(infoRequestObj);
-		InfoResponse infoResponseObj = infoRequest.waitForResponse();
-		infoRequest.close();
+		Channel infoRequest = new TCPChannel(s);
+		infoRequest.write(infoRequestObj);
+		InfoResponse infoResponseObj = null;
+		try {
+			infoResponseObj = (InfoResponse) infoRequest.read();
+		} catch (ClassNotFoundException e) {
+			// does not happen
+			e.printStackTrace();
+		}
+		s.close();
 
 		if (infoResponseObj.getSize() < 0)
 			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");

@@ -33,6 +33,7 @@ import message.request.BuyRequest;
 import message.request.CreditsRequest;
 import message.request.DownloadFileRequest;
 import message.request.DownloadTicketRequest;
+import message.request.InfoRequest;
 import message.request.ListRequest;
 import message.request.LoginRequest;
 import message.request.LogoutRequest;
@@ -67,7 +68,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 	private Channel channel;
 	private Channel rsaChannelToProxy;
 	private Channel rsaChannelFromProxy;
-	private Channel aesChannel;
 
 	private File downloadDirectory;
 	private File keyDir;
@@ -170,7 +170,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
 			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
 			byte[] iv = Base64.decode(msg_2nd.getIV());
-			channel = new AESChannel(channel, originalKey, iv);
+			channel = channel;//new AESChannel(channel, originalKey, iv);
 
 			LoginMessageFinal msg_3rd = new LoginMessageFinal(msg_2nd.getProxyChallenge());
 			channel.write(msg_3rd);
@@ -259,10 +259,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 	public Response download(String filename) throws IOException {
 
 		DownloadTicketRequest message = new DownloadTicketRequest(filename);
-		Object response;
+		Object response = null;
 		try {
+			System.out.println(socket.isClosed());
 			channel.write(message);
 			response = (Response) channel.read();
+			System.out.println("download");
 
 			if (response instanceof MessageResponse) {
 				return (Response) response;
@@ -271,10 +273,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 			DownloadTicketResponse ticketResponse = (DownloadTicketResponse) response;
 			DownloadTicket ticket = ticketResponse.getTicket();
 
+			
 			Socket s = new Socket(ticket.getAddress(), ticket.getPort());
-			SimpleTcpRequest<DownloadFileRequest, Response> req = new SimpleTcpRequest<DownloadFileRequest, Response>(s);
-			req.writeRequest(new DownloadFileRequest(ticket));
-			Response downloadResponse = req.waitForResponse();
+			Channel req = new TCPChannel(s);
+			req.write(new DownloadFileRequest(ticket));
+			Response downloadResponse = (Response)req.read();
+			s.close();
 
 			if (downloadResponse instanceof MessageResponse) {
 				return (Response) downloadResponse;
@@ -283,9 +287,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 			return downloadResponseCasted;
 
-		} catch (ClassNotFoundException e) {
-			throw new IOException("Failed Buy Request");
 		} catch (SocketException e) {
+			return new MessageResponse("Lost Connection");
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
 			return new MessageResponse("Lost Connection");
 		}
 	}
