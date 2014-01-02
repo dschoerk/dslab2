@@ -41,6 +41,7 @@ import message.response.UserInfoResponse;
 import model.DownloadTicket;
 import model.FileServerInfo;
 import model.UserInfo;
+import networkio.TCPChannel;
 
 import org.bouncycastle.openssl.PEMReader;
 
@@ -256,6 +257,9 @@ public class Proxy implements IProxyCli, Runnable {
 				}
 			} catch (IOException e) {
 
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
 		}
 
@@ -268,12 +272,13 @@ public class Proxy implements IProxyCli, Runnable {
 			return null;
 		}
 
-		private void populateFiles(MyFileServerInfo f) throws IOException {
+		private void populateFiles(MyFileServerInfo f) throws IOException, ClassNotFoundException {
 			// Ask the new Fileserver what files he has
 			ListRequest reqObj = new ListRequest();
-			SimpleTcpRequest<Request, Response> req = new SimpleTcpRequest<Request, Response>(f.createSocket());
-			req.writeRequest(reqObj);
-			ListResponse respObj = (ListResponse) req.waitForResponse();
+			Socket sock = f.createSocket();
+			TCPChannel req = new TCPChannel(sock);
+			req.write(reqObj);
+			ListResponse respObj = (ListResponse) req.read();
 
 			Set<String> filenamesFromServer = respObj.getFileNames(); // Files
 																		// the
@@ -288,18 +293,20 @@ public class Proxy implements IProxyCli, Runnable {
 			filesWeGetFromServer.removeAll(knownFiles.keySet());
 
 			for (String filename : filesWeGetFromServer) {
-				req = new SimpleTcpRequest<Request, Response>(f.createSocket());
+				sock = f.createSocket();
+				req = new TCPChannel(sock);
 				InfoRequest infoObj = new InfoRequest(filename);
-				req.writeRequest(infoObj);
-				InfoResponse infoResp = (InfoResponse) req.waitForResponse();
+				req.write(infoObj);
+				InfoResponse infoResp = (InfoResponse) req.read();
 				req.close();
 
-				req = new SimpleTcpRequest<Request, Response>(f.createSocket());
+				sock = f.createSocket();
+				req = new TCPChannel(sock);
 				String checksum = ChecksumUtils.generateChecksum("", filename, 0, infoResp.getSize());
 				DownloadTicket ticket = new DownloadTicket("", filename, checksum, null, 0);
 				DownloadFileRequest downloadObj = new DownloadFileRequest(ticket);
-				req.writeRequest(downloadObj);
-				DownloadFileResponse downloadResp = (DownloadFileResponse) req.waitForResponse();
+				req.write(downloadObj);
+				DownloadFileResponse downloadResp = (DownloadFileResponse) req.read();
 				req.close();
 
 				FileInfo fileInfo = new FileInfo(filename, 0, downloadResp.getContent());
@@ -309,10 +316,11 @@ public class Proxy implements IProxyCli, Runnable {
 			}
 
 			for (String filename : filesWeUploadToServer) {
-				req = new SimpleTcpRequest<Request, Response>(f.createSocket());
+				sock = f.createSocket();
+				req = new TCPChannel(sock);
 				UploadRequest uploadObj = new UploadRequest(filename, 0, knownFiles.get(filename).getContent());
-				req.writeRequest(uploadObj);
-				MessageResponse uploadResp = (MessageResponse) req.waitForResponse();
+				req.write(uploadObj);
+				MessageResponse uploadResp = (MessageResponse) req.read();
 				req.close();
 			}
 		}
