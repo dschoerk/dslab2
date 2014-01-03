@@ -147,4 +147,8 @@ public class Fileserver implements IFileServerCli, Runnable {
 		}
 		return data;*/
 	}
+
+	public Key getHMACKey() {
+		return shaKey;
+	}
 }

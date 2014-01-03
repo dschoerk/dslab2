@@ -49,7 +49,9 @@ import model.DownloadTicket;
 import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
+import networkio.HMACWrapped;
 import networkio.RSAChannel;
+import networkio.Serializer;
 import networkio.TCPChannel;
 
 import org.bouncycastle.openssl.PEMReader;
@@ -273,7 +275,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 			
 			Socket s = new Socket(ticket.getAddress(), ticket.getPort());
 			Channel req = new TCPChannel(s);
-			req.write(new DownloadFileRequest(ticket));
+			
+			DownloadFileRequest dfr = new DownloadFileRequest(ticket);
+			req.write(dfr);
 			Response downloadResponse = (Response)req.read();
 			s.close();
 

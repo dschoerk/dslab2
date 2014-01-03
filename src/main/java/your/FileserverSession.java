@@ -6,10 +6,14 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+
+import javax.crypto.Mac;
 
 import message.Response;
 import message.request.DownloadFileRequest;
@@ -24,6 +28,7 @@ import message.response.MessageResponse;
 import message.response.VersionResponse;
 import model.DownloadTicket;
 import networkio.Channel;
+import networkio.HMACWrapped;
 import networkio.TCPChannel;
 import server.IFileServer;
 import util.ChecksumUtils;
@@ -33,6 +38,7 @@ public class FileserverSession implements IFileServer, Runnable {
 	private Socket socket;
 	private Fileserver parent;
 
+	private Mac hmac;
 	private Channel channel;
 
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
@@ -42,6 +48,17 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		this.socket = socket;
 		this.parent = parent;
+		
+		try {
+			hmac = Mac.getInstance("HmacSHA256");
+			hmac.init(parent.getHMACKey());
+		} catch (InvalidKeyException e1) {
+			// does not happen
+			e1.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// does not happen
+			e.printStackTrace();
+		}
 
 		try {
 			channel = new TCPChannel(socket);
@@ -144,6 +161,37 @@ public class FileserverSession implements IFileServer, Runnable {
 		}
 
 	}
+	
+	public void hmacwrapped(HMACWrapped obj)
+	{
+		System.out.println("received hmac wrapped");
+		System.out.println("checksum correct: "+obj.isChecksumCorrect(hmac));
+		
+		try {
+			Object o = obj.getObject();
+			Object response = null;
+			if (hasArgument.contains(o.getClass())) {
+				response = commandMap.get(o.getClass()).invoke(this, o);
+			} else {
+				response = commandMap.get(o.getClass()).invoke(this);
+			}
+			channel.write(response);
+
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			System.err.println("lost connection");
+			// e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvocationTargetException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 
 	static {
 		try {
@@ -163,6 +211,9 @@ public class FileserverSession implements IFileServer, Runnable {
 			hasArgument.add(UploadRequest.class);
 
 			commandMap.put(ListRequest.class, FileserverSession.class.getMethod("list"));
+			
+			commandMap.put(HMACWrapped.class, FileserverSession.class.getMethod("hmacwrapped", HMACWrapped.class));
+			hasArgument.add(HMACWrapped.class);
 
 		} catch (NoSuchMethodException e) {
 			// does not happen

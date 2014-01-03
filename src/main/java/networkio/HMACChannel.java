@@ -2,11 +2,11 @@ package networkio;
 
 import java.io.IOException;
 import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
 import javax.crypto.Mac;
-import javax.crypto.SecretKey;
 
 public class HMACChannel extends Channel {
 
@@ -15,7 +15,7 @@ public class HMACChannel extends Channel {
 
 	private boolean correctChecksum;
 
-	public HMACChannel(Channel parent, SecretKey key) {
+	public HMACChannel(Channel parent, Key key) {
 		this.parent = parent;
 		try {
 			hMac = Mac.getInstance("HmacSHA256");
