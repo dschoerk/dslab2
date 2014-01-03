@@ -27,6 +27,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import management.ProxyManagement;
+import message.AliveMessage;
 import message.Response;
 import message.request.DownloadFileRequest;
 import message.request.InfoRequest;
@@ -43,6 +44,7 @@ import model.FileServerInfo;
 import model.UserInfo;
 import networkio.Channel;
 import networkio.TCPChannel;
+import networkio.UDPChannel;
 
 import org.bouncycastle.openssl.PEMReader;
 
@@ -82,8 +84,8 @@ public class Proxy implements IProxyCli, Runnable {
 		factory.startProxy(cfg, shell);
 	}
 
-	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, Key shaKey, File keyFolder, PrivateKey privKey,
-			Shell shell) throws IOException {
+	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, Key shaKey, File keyFolder,
+			PrivateKey privKey, Shell shell) throws IOException {
 		if (shell != null) {
 			shell.register(this);
 			shellThread = new Thread(shell);
@@ -119,7 +121,7 @@ public class Proxy implements IProxyCli, Runnable {
 
 		fileserverOnlineTimer = new Timer();
 		fileserverOnlineTimer.schedule(fsOnlineTask, 0, checkPeriod);
-		
+
 		managementComponent = new ProxyManagement(this);
 	}
 
@@ -220,27 +222,37 @@ public class Proxy implements IProxyCli, Runnable {
 	private class ProxyUdpHandler implements Runnable {
 
 		private DatagramSocket socket;
+		private UDPChannel channel;
 
 		public ProxyUdpHandler(DatagramSocket socket) {
 			this.socket = socket;
+			try {
+				channel = new UDPChannel(socket);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 
 		@Override
 		public void run() {
 
-			byte[] buf = new byte[32];
-			DatagramPacket p = new DatagramPacket(buf, buf.length);
+			//byte[] buf = new byte[32];
+			//DatagramPacket p = new DatagramPacket(buf, buf.length);
 
 			try {
 				while (true) {
-					socket.receive(p);
-					int port = Integer.parseInt(new String(buf).trim());
+					//socket.receive(p);
+					//int port = Integer.parseInt(new String(buf).trim());
+					
+					AliveMessage msg = (AliveMessage) channel.read();
+					int port = msg.getPort();
+					DatagramPacket p = channel.getLatestPacket();
 					MyFileServerInfo f = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
 
 					synchronized (knownFileservers) {
 
 						MyFileServerInfo server = findServer(f);
-						// System.out.println(server==null?"new server":"update "+server.Info());
 
 						if (server == null) { // new fileserver
 							server = f;
@@ -311,7 +323,7 @@ public class Proxy implements IProxyCli, Runnable {
 				req.close();
 
 				FileInfo fileInfo = new FileInfo(filename, 0, downloadResp.getContent());
-				//distributeFile(fileInfo,0);
+				// distributeFile(fileInfo,0);
 
 				knownFiles.put(filename, fileInfo);
 			}
@@ -332,7 +344,7 @@ public class Proxy implements IProxyCli, Runnable {
 		return MyFileServerInfo.minimumUsage(knownFileservers);
 	}
 
-	public void distributeFile(ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum, FileInfo info, int version) {
+	public void distributeFile(ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum, FileInfo info, int version) {
 
 		for (MyFileServerInfo server : writeQuorum.values()) {
 
@@ -341,7 +353,7 @@ public class Proxy implements IProxyCli, Runnable {
 				Channel req = new TCPChannel(s);
 				UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
 				req.write(requestObj);
-				MessageResponse responseObj = (MessageResponse)req.read();
+				MessageResponse responseObj = (MessageResponse) req.read();
 				s.close();
 
 			} catch (IOException e) {
@@ -364,7 +376,7 @@ public class Proxy implements IProxyCli, Runnable {
 
 	public PublicKey getUserKey(String username) {
 		for (File s : keyFolder.listFiles()) {
-			if (s.getName().equals(username+".pub.pem")) {
+			if (s.getName().equals(username + ".pub.pem")) {
 				PEMReader in;
 				try {
 					in = new PEMReader(new FileReader(s));
@@ -379,20 +391,19 @@ public class Proxy implements IProxyCli, Runnable {
 
 		return null;
 	}
-	
-	public ProxyManagement getManagementComonent(){
-	    return managementComponent;
+
+	public ProxyManagement getManagementComonent() {
+		return managementComponent;
 	}
-	public HashMap<MyFileServerInfo, Long> getOnlineServer()
-	{
+
+	public HashMap<MyFileServerInfo, Long> getOnlineServer() {
 		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
 
-		for (MyFileServerInfo server : knownFileservers) 
+		for (MyFileServerInfo server : knownFileservers)
 
-			if (!server.isOnline())
-			{
+			if (!server.isOnline()) {
 				onlineservers.put(server, server.getUsage());
 			}
-			return onlineservers;
-		}
+		return onlineservers;
+	}
 }

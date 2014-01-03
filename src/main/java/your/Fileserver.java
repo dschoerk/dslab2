@@ -16,7 +16,9 @@ import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import message.AliveMessage;
 import message.response.MessageResponse;
+import networkio.UDPChannel;
 import server.IFileServerCli;
 import util.ComponentFactory;
 import util.Config;
@@ -53,13 +55,18 @@ public class Fileserver implements IFileServerCli, Runnable {
 
 		InetAddress receiverAddress = InetAddress.getByName(proxyhost);
 		aliveSocket = new DatagramSocket();
+		final UDPChannel channel = new UDPChannel(aliveSocket,receiverAddress,proxyudpport);
 
-		byte[] buf = (tcpport + "\0").getBytes();
-		final DatagramPacket keepAlivePacket = new DatagramPacket(buf, buf.length, receiverAddress, proxyudpport);
+		//byte[] buf = (tcpport + "\0").getBytes();
+		final AliveMessage msg = new AliveMessage(tcpport);
+		
+		//final DatagramPacket keepAlivePacket = new DatagramPacket(buf, buf.length, receiverAddress, proxyudpport);
+		
 		TimerTask aliveTask = new TimerTask() {
 			public void run() {
 				try {
-					aliveSocket.send(keepAlivePacket);
+					//aliveSocket.send(keepAlivePacket);
+					channel.write(msg);
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();

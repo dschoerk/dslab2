@@ -33,8 +33,8 @@ public class HMACChannel extends Channel {
 	public void write(byte[] data) throws IOException {
 
 		byte[] checksum = hMac.doFinal(data);
-		parent.write(checksum);
 		parent.write(data);
+		parent.write(checksum);
 	}
 
 	@Override
