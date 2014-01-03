@@ -329,7 +329,7 @@ public class ProxySession implements Runnable, IProxy {
 	private ConcurrentHashMap<Long, MyFileServerInfo> getWriteQuorum()
 	{
 		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
-
+		
 		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
 		{	
 			int i=0;

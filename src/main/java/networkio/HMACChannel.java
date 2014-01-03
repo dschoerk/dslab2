@@ -15,35 +15,25 @@ public class HMACChannel extends Channel {
 
 	private boolean correctChecksum;
 
-	public HMACChannel(Channel parent, Key key) {
+	public HMACChannel(Channel parent, Mac hmac) {
 		this.parent = parent;
-		try {
-			hMac = Mac.getInstance("HmacSHA256");
-			hMac.init(key);
-		} catch (NoSuchAlgorithmException e) {
-			// does not happen
-			e.printStackTrace();
-		} catch (InvalidKeyException e) {
-			// does not happen
-			e.printStackTrace();
-		}
+		this.hMac = hmac;
 	}
 
 	@Override
 	public void write(byte[] data) throws IOException {
-
-		byte[] checksum = hMac.doFinal(data);
-		parent.write(data);
-		parent.write(checksum);
+		
+		HMACWrapped w = new HMACWrapped(data, hMac.doFinal(data));
+		parent.write(Serializer.encode(w));
 	}
 
 	@Override
 	public byte[] readBytes() throws ClassNotFoundException, IOException {
 
 		byte[] data = parent.readBytes();
-		byte[] sentChecksum = parent.readBytes();
-		correctChecksum = MessageDigest.isEqual(sentChecksum, hMac.doFinal(data));
-		return data;
+		HMACWrapped w = (HMACWrapped)Serializer.decode(data);
+		correctChecksum = w.isChecksumCorrect(hMac);
+		return Serializer.encode(w.getObject());
 	}
 
 	public boolean isChecksumCorrect() {

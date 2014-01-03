@@ -86,7 +86,7 @@ public class FileserverSession implements IFileServer, Runnable {
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.err.println("lost connection");
-			// e.printStackTrace();
+			e.printStackTrace();
 		} catch (IllegalAccessException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -162,7 +162,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	}
 	
-	public void hmacwrapped(HMACWrapped obj)
+	public Response hmacwrapped(HMACWrapped obj)
 	{
 		System.out.println("received hmac wrapped");
 		System.out.println("checksum correct: "+obj.isChecksumCorrect(hmac));
@@ -175,12 +175,13 @@ public class FileserverSession implements IFileServer, Runnable {
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
-			channel.write(response);
+			
+			return (Response)response;
 
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.err.println("lost connection");
-			// e.printStackTrace();
+			e.printStackTrace();
 		} catch (IllegalAccessException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -191,6 +192,7 @@ public class FileserverSession implements IFileServer, Runnable {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		return null;
 	}
 
 	static {
