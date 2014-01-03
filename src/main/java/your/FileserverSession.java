@@ -22,6 +22,7 @@ import message.request.ListRequest;
 import message.request.UploadRequest;
 import message.request.VersionRequest;
 import message.response.DownloadFileResponse;
+import message.response.MessageIntegrityErrorResponse;
 import message.response.InfoResponse;
 import message.response.ListResponse;
 import message.response.MessageResponse;
@@ -48,7 +49,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		this.socket = socket;
 		this.parent = parent;
-		
+
 		try {
 			hmac = Mac.getInstance("HmacSHA256");
 			hmac.init(parent.getHMACKey());
@@ -161,12 +162,14 @@ public class FileserverSession implements IFileServer, Runnable {
 		}
 
 	}
-	
-	public Response hmacwrapped(HMACWrapped obj)
-	{
+
+	public Response hmacwrapped(HMACWrapped obj) {
 		System.out.println("received hmac wrapped");
-		System.out.println("checksum correct: "+obj.isChecksumCorrect(hmac));
-		
+		System.out.println("checksum correct: " + obj.isChecksumCorrect(hmac));
+
+		if (!obj.isChecksumCorrect(hmac))
+			return new MessageIntegrityErrorResponse();
+
 		try {
 			Object o = obj.getObject();
 			Object response = null;
@@ -175,8 +178,8 @@ public class FileserverSession implements IFileServer, Runnable {
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
-			
-			return (Response)response;
+
+			return (Response) response;
 
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
@@ -213,7 +216,7 @@ public class FileserverSession implements IFileServer, Runnable {
 			hasArgument.add(UploadRequest.class);
 
 			commandMap.put(ListRequest.class, FileserverSession.class.getMethod("list"));
-			
+
 			commandMap.put(HMACWrapped.class, FileserverSession.class.getMethod("hmacwrapped", HMACWrapped.class));
 			hasArgument.add(HMACWrapped.class);
 

@@ -37,6 +37,7 @@ import message.response.InfoResponse;
 import message.response.ListResponse;
 import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
+import message.response.MessageIntegrityErrorResponse;
 import message.response.MessageResponse;
 import message.response.VersionResponse;
 import model.DownloadTicket;
@@ -224,19 +225,13 @@ public class ProxySession implements Runnable, IProxy {
 		if (fileserver == null)
 			return new MessageResponse("No Fileserver available");
 
-		Socket s = fileserver.createSocket();
-		InfoRequest infoRequestObj = new InfoRequest(request.getFilename());
-		Channel infoRequest = new TCPChannel(s);
-		infoRequest.write(infoRequestObj);
-		InfoResponse infoResponseObj = null;
-		try {
-			infoResponseObj = (InfoResponse) infoRequest.read();
-		} catch (ClassNotFoundException e) {
-			// does not happen
-			e.printStackTrace();
+		Response r = parent.infoRequest(fileserver, request.getFilename());
+		if(r == null || r instanceof MessageIntegrityErrorResponse)
+		{
+			r = parent.infoRequest(fileserver, request.getFilename());
 		}
-		s.close();
-
+		InfoResponse infoResponseObj = (InfoResponse) r;  
+		
 		if (infoResponseObj.getSize() < 0)
 			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
 

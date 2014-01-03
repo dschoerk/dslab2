@@ -38,6 +38,7 @@ import message.request.InfoRequest;
 import message.request.ListRequest;
 import message.request.UploadRequest;
 import message.response.DownloadFileResponse;
+import message.response.MessageIntegrityErrorResponse;
 import message.response.FileServerInfoResponse;
 import message.response.InfoResponse;
 import message.response.ListResponse;
@@ -303,58 +304,49 @@ public class Proxy implements IProxyCli, Runnable {
 			return null;
 		}
 
-/*		private void populateFiles(MyFileServerInfo f) throws IOException, ClassNotFoundException {
-			// Ask the new Fileserver what files he has
-			ListRequest reqObj = new ListRequest();
-			Socket sock = f.createSocket();
-			Channel req = createFsChannel(sock);
-			req.write(reqObj);
-			ListResponse respObj = (ListResponse) req.read();
-
-			Set<String> filenamesFromServer = respObj.getFileNames(); // Files
-			// the
-			// server
-			// knows
-			req.close();
-
-			Set<String> filesWeUploadToServer = new HashSet<String>(knownFiles.keySet());
-			filesWeUploadToServer.removeAll(filenamesFromServer);
-
-			Set<String> filesWeGetFromServer = new HashSet<String>(filenamesFromServer);
-			filesWeGetFromServer.removeAll(knownFiles.keySet());
-
-			for (String filename : filesWeGetFromServer) {
-				sock = f.createSocket();
-				req = createFsChannel(sock);
-				InfoRequest infoObj = new InfoRequest(filename);
-				req.write(infoObj);
-				InfoResponse infoResp = (InfoResponse) req.read();
-				req.close();
-
-				sock = f.createSocket();
-				req = createFsChannel(sock);
-				String checksum = ChecksumUtils.generateChecksum("", filename, 0, infoResp.getSize());
-				DownloadTicket ticket = new DownloadTicket("", filename, checksum, null, 0);
-				DownloadFileRequest downloadObj = new DownloadFileRequest(ticket);
-				req.write(downloadObj);
-				DownloadFileResponse downloadResp = (DownloadFileResponse) req.read();
-				req.close();
-
-				FileInfo fileInfo = new FileInfo(filename, 0, downloadResp.getContent());
-				// distributeFile(fileInfo,0);
-
-				knownFiles.put(filename, fileInfo);
-			}
-
-			for (String filename : filesWeUploadToServer) {
-				sock = f.createSocket();
-				req = createFsChannel(sock);
-				UploadRequest uploadObj = new UploadRequest(filename, 0, knownFiles.get(filename).getContent());
-				req.write(uploadObj);
-				MessageResponse uploadResp = (MessageResponse) req.read();
-				req.close();
-			}
-		}*/
+		/*
+		 * private void populateFiles(MyFileServerInfo f) throws IOException,
+		 * ClassNotFoundException { // Ask the new Fileserver what files he has
+		 * ListRequest reqObj = new ListRequest(); Socket sock =
+		 * f.createSocket(); Channel req = createFsChannel(sock);
+		 * req.write(reqObj); ListResponse respObj = (ListResponse) req.read();
+		 * 
+		 * Set<String> filenamesFromServer = respObj.getFileNames(); // Files //
+		 * the // server // knows req.close();
+		 * 
+		 * Set<String> filesWeUploadToServer = new
+		 * HashSet<String>(knownFiles.keySet());
+		 * filesWeUploadToServer.removeAll(filenamesFromServer);
+		 * 
+		 * Set<String> filesWeGetFromServer = new
+		 * HashSet<String>(filenamesFromServer);
+		 * filesWeGetFromServer.removeAll(knownFiles.keySet());
+		 * 
+		 * for (String filename : filesWeGetFromServer) { sock =
+		 * f.createSocket(); req = createFsChannel(sock); InfoRequest infoObj =
+		 * new InfoRequest(filename); req.write(infoObj); InfoResponse infoResp
+		 * = (InfoResponse) req.read(); req.close();
+		 * 
+		 * sock = f.createSocket(); req = createFsChannel(sock); String checksum
+		 * = ChecksumUtils.generateChecksum("", filename, 0,
+		 * infoResp.getSize()); DownloadTicket ticket = new DownloadTicket("",
+		 * filename, checksum, null, 0); DownloadFileRequest downloadObj = new
+		 * DownloadFileRequest(ticket); req.write(downloadObj);
+		 * DownloadFileResponse downloadResp = (DownloadFileResponse)
+		 * req.read(); req.close();
+		 * 
+		 * FileInfo fileInfo = new FileInfo(filename, 0,
+		 * downloadResp.getContent()); // distributeFile(fileInfo,0);
+		 * 
+		 * knownFiles.put(filename, fileInfo); }
+		 * 
+		 * for (String filename : filesWeUploadToServer) { sock =
+		 * f.createSocket(); req = createFsChannel(sock); UploadRequest
+		 * uploadObj = new UploadRequest(filename, 0,
+		 * knownFiles.get(filename).getContent()); req.write(uploadObj);
+		 * MessageResponse uploadResp = (MessageResponse) req.read();
+		 * req.close(); } }
+		 */
 	}
 
 	private Channel createFsChannel(Socket s) throws IOException {
@@ -369,24 +361,43 @@ public class Proxy implements IProxyCli, Runnable {
 	public void distributeFile(ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum, FileInfo info, int version) {
 
 		for (MyFileServerInfo server : writeQuorum.values()) {
-			Socket s;
+
+			Response res = uploadRequest(info, version, server);
+			if (res == null || res instanceof MessageIntegrityErrorResponse) {
+				// Try again if failed
+				res = uploadRequest(info, version, server);
+			}
+		}
+	}
+
+	private Response uploadRequest(FileInfo info, int version, MyFileServerInfo server) {
+		
+		Socket s = null;
+		try {
+			s = server.createSocket();
+			Channel req = createFsChannel(s);
+			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
+			HMACWrapped wrap = new HMACWrapped(requestObj, hmac);
+			req.write(wrap);
+			return (Response) req.read();
+
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally
+		{
 			try {
-				s = server.createSocket();
-				Channel req = createFsChannel(s);
-				UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
-				HMACWrapped wrap = new HMACWrapped(requestObj, hmac);
-				req.write(wrap);
-				MessageResponse responseObj = (MessageResponse) req.read();
 				s.close();
-				
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
+
+		return null;
 	}
 
 	public Map<String, FileInfo> getFiles() {
@@ -422,12 +433,33 @@ public class Proxy implements IProxyCli, Runnable {
 	public HashMap<MyFileServerInfo, Long> getOnlineServer() {
 		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
 
-		for (MyFileServerInfo server : knownFileservers)
-		{
+		for (MyFileServerInfo server : knownFileservers) {
 			if (server.isOnline()) {
 				onlineservers.put(server, server.getUsage());
 			}
 		}
 		return onlineservers;
+	}
+
+	public Response infoRequest(MyFileServerInfo fileserver, String filename) {
+		Response infoResponseObj = null;
+		try {
+			Socket s = fileserver.createSocket();
+			InfoRequest infoRequestObj = new InfoRequest(filename);
+			Channel infoRequest = new TCPChannel(s);
+			infoRequest.write(infoRequestObj);
+			try {
+				infoResponseObj = (Response) infoRequest.read();
+			} catch (ClassNotFoundException e) {
+				// does not happen
+				e.printStackTrace();
+			}
+			s.close();
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		return infoResponseObj;
 	}
 }
