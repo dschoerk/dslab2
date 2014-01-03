@@ -65,9 +65,10 @@ import client.IClientCli;
 public class Client implements IClientCli, RMICallbackInterface {
 
 	private Socket socket;
-	private Channel channel;
+	private Channel base_channel;
 	private Channel rsaChannelToProxy;
 	private Channel rsaChannelFromProxy;
+	private Channel aes_channel;
 
 	private File downloadDirectory;
 	private File keyDir;
@@ -95,8 +96,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		try {
 			socket = new Socket(host, port);
-			channel = new Base64Channel(new TCPChannel(socket));
-			rsaChannelToProxy = new RSAChannel(channel, pubk, Cipher.ENCRYPT_MODE);
+			base_channel = new Base64Channel(new TCPChannel(socket));
+			rsaChannelToProxy = new RSAChannel(base_channel, pubk, Cipher.ENCRYPT_MODE);
 			// out = new ObjectOutputStream(socket.getOutputStream());
 			// out.flush();
 			// in = new ObjectInputStream(socket.getInputStream());
@@ -118,10 +119,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 	}
 
 	private PrivateKey getUserKey(String username, final String password) {
-		System.out.println(keyDir.listFiles().length);
 		for (File s : keyDir.listFiles()) {
 			if (s.getName().equals(username + ".pem")) {
-				System.out.println("found");
 				try {
 					PEMReader in = new PEMReader(new FileReader(s.getAbsolutePath()), new PasswordFinder() {
 						@Override
@@ -152,7 +151,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		Key privk = getUserKey(username, password); // read private key for
 													// username
-		rsaChannelFromProxy = new RSAChannel(channel, privk, Cipher.DECRYPT_MODE);
+		rsaChannelFromProxy = new RSAChannel(base_channel, privk, Cipher.DECRYPT_MODE);
 
 		SecureRandom rand = new SecureRandom();
 		byte[] client_challenge = new byte[32];
@@ -170,12 +169,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
 			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
 			byte[] iv = Base64.decode(msg_2nd.getIV());
-			channel = new AESChannel(channel, originalKey, iv);
+			aes_channel = new AESChannel(base_channel, originalKey, iv);
 
 			LoginMessageFinal msg_3rd = new LoginMessageFinal(msg_2nd.getProxyChallenge());
-			channel.write(msg_3rd);
+			aes_channel.write(msg_3rd);
 
-			response = channel.read();
+			response = aes_channel.read();
 			LoginResponse loginresponse = (LoginResponse) response;
 			return loginresponse;
 
@@ -197,8 +196,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		Response response;
 		try {
-			channel.write(message);
-			response = (Response) channel.read();
+			aes_channel.write(message);
+			response = (Response) aes_channel.read();
 
 			if (response instanceof MessageResponse) {
 				return response;
@@ -221,8 +220,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		Object response;
 		try {
-			channel.write(message);
-			response = (Response) channel.read();
+			aes_channel.write(message);
+			response = (Response) aes_channel.read();
 			BuyResponse buyresponse = (BuyResponse) response;
 			return new MessageResponse("You now have " + buyresponse.getCredits() + "!");
 
@@ -241,8 +240,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		Response response;
 		try {
-			channel.write(req);
-			response = (Response) channel.read();
+			aes_channel.write(req);
+			response = (Response) aes_channel.read();
 			return response;
 
 		} catch (ClassNotFoundException e) {
@@ -261,8 +260,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 		DownloadTicketRequest message = new DownloadTicketRequest(filename);
 		Object response = null;
 		try {
-			channel.write(message);
-			response = (Response) channel.read();
+			aes_channel.write(message);
+			response = (Response) aes_channel.read();
 
 			if (response instanceof MessageResponse) {
 				return (Response) response;
@@ -308,8 +307,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		Object response;
 		try {
-			channel.write(upload);
-			response = (Response) channel.read();
+			aes_channel.write(upload);
+			response = (Response) aes_channel.read();
 			MessageResponse uploadresponse = (MessageResponse) response;
 			return uploadresponse;
 
@@ -324,11 +323,11 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public MessageResponse logout() throws IOException {
 		LogoutRequest message = new LogoutRequest();
-		channel.write(message);
+		aes_channel.write(message);
 
 		// muss gelesen werden!
 		try {
-			MessageResponse uploadresponse = (MessageResponse) channel.read();
+			MessageResponse uploadresponse = (MessageResponse) aes_channel.read();
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

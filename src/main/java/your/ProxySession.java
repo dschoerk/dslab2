@@ -97,7 +97,7 @@ public class ProxySession implements Runnable, IProxy {
 			while (true) {
 
 				Object o = channel_in.read();
-				// System.out.println("incoming Request: " + o.getClass());
+
 
 				Object response = null;
 				if (hasArgument.contains(o.getClass())) {
@@ -106,7 +106,11 @@ public class ProxySession implements Runnable, IProxy {
 					response = commandMap.get(o.getClass()).invoke(this);
 				}
 				channel_out.write(response);
-
+				
+				if(user == null)
+				{
+					channel_in = new RSAChannel(base_channel, parent.getPrivKey(), Cipher.DECRYPT_MODE);
+				}
 			}
 		} catch (ClassNotFoundException e) {
 			e.printStackTrace();
@@ -158,6 +162,7 @@ public class ProxySession implements Runnable, IProxy {
 				Base64.encode(sec_key.getEncoded()), 
 				Base64.encode(iv));
 		channel_out.write(sec);
+
 		
 		channel_in = new AESChannel(base_channel, sec_key, iv);
 		channel_out = channel_in;
@@ -278,7 +283,7 @@ public class ProxySession implements Runnable, IProxy {
 				e.printStackTrace();
 			}
 		}
-		 System.out.println("Version before " + version);
+
 		if(version!=-1)
 		{
 			version++;
@@ -286,7 +291,7 @@ public class ProxySession implements Runnable, IProxy {
 		else{
 			version=1;
 		}
-		System.out.println("Version after " + version);
+
 		FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
 		parent.distributeFile(writeQuorum,info,version);
 		user.addCredits(2 * request.getContent().length);
