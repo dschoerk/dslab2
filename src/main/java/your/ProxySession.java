@@ -238,7 +238,7 @@ public class ProxySession implements Runnable, IProxy {
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
-		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getReadQuorum();
+		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getQuorum(NumberNR);
 		if (readQuorum.isEmpty()){
 			return new MessageResponse("No Fileserver available");
 		}
@@ -319,8 +319,8 @@ public class ProxySession implements Runnable, IProxy {
 		
 		NumberNR=(int) Math.ceil(parent.getOnlineServer().size()/2.0);
 		NumberNW=(int)Math.ceil(parent.getOnlineServer().size()/2.0)+1;
-		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getReadQuorum();
-		ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum=getWriteQuorum();
+		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getQuorum(NumberNR);
+		ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum=getQuorum(NumberNW);
 		if (readQuorum.isEmpty()){
 			return new MessageResponse("No Fileserver available");
 		}	
@@ -362,31 +362,14 @@ public class ProxySession implements Runnable, IProxy {
 		return user;
 	}
 	
-	private ConcurrentHashMap<Long, MyFileServerInfo> getReadQuorum()
-	{
-		ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
-
-		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
-		{	
-			int i=0;
-			while(i<NumberNR)
-			{
-				readQuorum.put(server.getUsage(), server);
-				i++;
-			}
-		}
-		return readQuorum;
-	}
-	
-	
-	private ConcurrentHashMap<Long, MyFileServerInfo> getWriteQuorum()
+	private ConcurrentHashMap<Long, MyFileServerInfo> getQuorum(int quorumSize)
 	{
 		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
 		
 		int i=0;
 		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
 		{	
-			if(i<NumberNW)
+			if(i<quorumSize)
 				writeQuorum.put(server.getUsage(), server);
 			else
 				break;
