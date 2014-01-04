@@ -56,7 +56,6 @@ import networkio.UDPChannel;
 import org.bouncycastle.openssl.PEMReader;
 
 import proxy.IProxyCli;
-import util.ChecksumUtils;
 import util.ComponentFactory;
 import util.Config;
 import cli.Command;
@@ -387,13 +386,14 @@ public class Proxy implements IProxyCli, Runnable {
 
 	public HashMap<MyFileServerInfo, Long> getOnlineServer() {
 		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
-
-		for (MyFileServerInfo server : knownFileservers) {
-			
-			System.out.println("server online "+server.getAddress());
-			if (server.isOnline()) {
-				onlineservers.put(server, server.getUsage());
-			}
+		List<MyFileServerInfo> copyknownFileservers= Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
+		copyknownFileservers.addAll(knownFileservers);
+		
+		while (!copyknownFileservers.isEmpty()) {
+		
+			MyFileServerInfo minimumUsedServer= MyFileServerInfo.minimumUsage(copyknownFileservers);
+			onlineservers.put(minimumUsedServer, minimumUsedServer.getUsage());
+			copyknownFileservers.remove(minimumUsedServer);
 		}
 		return onlineservers;
 	}

@@ -52,7 +52,6 @@ public class Fileserver implements IFileServerCli, Runnable {
 			shellThread.start();
 		}
 
-		System.out.println("neuer Fileserver");
 		this.shaKey = shaKey;
 		downloadDir = new File(fileserverdir);
 		initVersionMap();

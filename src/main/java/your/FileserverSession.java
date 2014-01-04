@@ -122,7 +122,7 @@ public class FileserverSession implements IFileServer, Runnable {
 		if (f == null)
 			return new MessageResponse("File \"" + request.getTicket().getFilename() + "\" does not exist");
 
-		if (!ChecksumUtils.verifyChecksum(request.getTicket().getUsername(), f, 0, request.getTicket().getChecksum())) {
+		if (!ChecksumUtils.verifyChecksum(request.getTicket().getUsername(), f, version.get(request.getTicket().getFilename()), request.getTicket().getChecksum())) {
 			return new MessageResponse("Download Ticket failed Checksum Test");
 		}
 
