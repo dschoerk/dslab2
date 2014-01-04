@@ -151,8 +151,6 @@ public class ProxySession implements Runnable, IProxy {
 			// may not happen
 			e1.printStackTrace();
 		} 
-		
-		
 		//byte[] sec_key = new byte[32];
 		rand.nextBytes(proxy_challenge);
 		rand.nextBytes(iv);
@@ -214,7 +212,6 @@ public class ProxySession implements Runnable, IProxy {
 		{
 			return new MessageResponse("No Fileserver available");
 		}
-		System.out.println("ListRequest");
 		Set<String> fileNames = new HashSet<String>();
 		
 		for(MyFileServerInfo ser : parent.getOnlineServer().keySet())
@@ -233,14 +230,12 @@ public class ProxySession implements Runnable, IProxy {
 			listRequest.close();
 			fileNames.addAll(listResponseObj.getFileNames());
 		}
-
 		return new ListResponse(fileNames);
 	}
 
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
 		
-		System.out.println("Download");
 		NumberNR=(int) Math.ceil(parent.getOnlineServer().size()/2.0);
 		if (user == null)
 			return new MessageResponse("You have to login first");
@@ -274,8 +269,7 @@ public class ProxySession implements Runnable, IProxy {
 					}else if(aktversion==version)
 					{
 						if(ser.getUsage()<server.getUsage())
-							server=ser;
-						
+							server=ser;		
 					}
 				}
 				else
@@ -301,19 +295,18 @@ public class ProxySession implements Runnable, IProxy {
 		if (user.getCredits() < infoResponseObj.getSize())
 			return new MessageResponse("Not enough Credits");
 
-		String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), 0,
+		String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), version,
 				infoResponseObj.getSize());
-
+	
 		DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
 				server.getAddress(), server.getTcpport());
-
 		user.addCredits(-infoResponseObj.getSize());
 		
-		FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
+		/*FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
 		if(file!=null){
 		    file.incDownloadCnt();
 		    parent.getManagementComonent().updateSubscriptions(file);
-		}
+		}*/
 		
 		server.incUsage(infoResponseObj.getSize());
 
@@ -323,8 +316,6 @@ public class ProxySession implements Runnable, IProxy {
 
 	@Override
 	public MessageResponse upload(UploadRequest request) throws IOException {
-
-		
 		if (user == null)
 			return new MessageResponse("You have to login first");
 		
@@ -334,8 +325,7 @@ public class ProxySession implements Runnable, IProxy {
 		ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum=getWriteQuorum();
 		if (readQuorum.isEmpty()){
 			return new MessageResponse("No Fileserver available");
-		}
-		
+		}	
 		int version=-1;
 		for (MyFileServerInfo server : readQuorum.values()) 
 		{
@@ -367,7 +357,6 @@ public class ProxySession implements Runnable, IProxy {
 		user = null;
 		return new MessageResponse("User logged out");
 	}
-
 	public User getUser() {
 		return user;
 	}
