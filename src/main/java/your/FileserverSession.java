@@ -41,7 +41,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	private Mac hmac;
 	private Channel channel;
-
+	private HashMap<String, Integer> version= new HashMap<String, Integer>();
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
 	private static Set<Class<?>> hasArgument = new HashSet<Class<?>>();
 
@@ -49,7 +49,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		this.socket = socket;
 		this.parent = parent;
-
+		version=parent.getVersionMap();
 		try {
 			hmac = Mac.getInstance("HmacSHA256");
 			hmac.init(parent.getHMACKey());
@@ -145,7 +145,9 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	@Override
 	public Response version(VersionRequest request) throws IOException {
-		return new VersionResponse(request.getFilename(), 0);
+		if(!(version.containsKey(request.getFilename())))
+			return new VersionResponse(request.getFilename(), -1);
+		return new VersionResponse(request.getFilename(), version.get(request.getFilename()));
 	}
 
 	@Override
@@ -156,6 +158,7 @@ public class FileserverSession implements IFileServer, Runnable {
 					+ request.getFilename());
 			fos.write(request.getContent());
 			fos.close();
+			version.put(request.getFilename(),request.getVersion());
 			return new MessageResponse("File \"" + request.getFilename() + "\" has been uploaded");
 		} catch (IOException e) {
 			return new MessageResponse("Error while uploading\"" + request.getFilename() + "\" !");

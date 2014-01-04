@@ -303,52 +303,7 @@ public class Proxy implements IProxyCli, Runnable {
 			}
 			return null;
 		}
-
-		/*
-		 * private void populateFiles(MyFileServerInfo f) throws IOException,
-		 * ClassNotFoundException { // Ask the new Fileserver what files he has
-		 * ListRequest reqObj = new ListRequest(); Socket sock =
-		 * f.createSocket(); Channel req = createFsChannel(sock);
-		 * req.write(reqObj); ListResponse respObj = (ListResponse) req.read();
-		 * 
-		 * Set<String> filenamesFromServer = respObj.getFileNames(); // Files //
-		 * the // server // knows req.close();
-		 * 
-		 * Set<String> filesWeUploadToServer = new
-		 * HashSet<String>(knownFiles.keySet());
-		 * filesWeUploadToServer.removeAll(filenamesFromServer);
-		 * 
-		 * Set<String> filesWeGetFromServer = new
-		 * HashSet<String>(filenamesFromServer);
-		 * filesWeGetFromServer.removeAll(knownFiles.keySet());
-		 * 
-		 * for (String filename : filesWeGetFromServer) { sock =
-		 * f.createSocket(); req = createFsChannel(sock); InfoRequest infoObj =
-		 * new InfoRequest(filename); req.write(infoObj); InfoResponse infoResp
-		 * = (InfoResponse) req.read(); req.close();
-		 * 
-		 * sock = f.createSocket(); req = createFsChannel(sock); String checksum
-		 * = ChecksumUtils.generateChecksum("", filename, 0,
-		 * infoResp.getSize()); DownloadTicket ticket = new DownloadTicket("",
-		 * filename, checksum, null, 0); DownloadFileRequest downloadObj = new
-		 * DownloadFileRequest(ticket); req.write(downloadObj);
-		 * DownloadFileResponse downloadResp = (DownloadFileResponse)
-		 * req.read(); req.close();
-		 * 
-		 * FileInfo fileInfo = new FileInfo(filename, 0,
-		 * downloadResp.getContent()); // distributeFile(fileInfo,0);
-		 * 
-		 * knownFiles.put(filename, fileInfo); }
-		 * 
-		 * for (String filename : filesWeUploadToServer) { sock =
-		 * f.createSocket(); req = createFsChannel(sock); UploadRequest
-		 * uploadObj = new UploadRequest(filename, 0,
-		 * knownFiles.get(filename).getContent()); req.write(uploadObj);
-		 * MessageResponse uploadResp = (MessageResponse) req.read();
-		 * req.close(); } }
-		 */
 	}
-
 	private Channel createFsChannel(Socket s) throws IOException {
 		return new TCPChannel(s);
 	}
@@ -434,6 +389,8 @@ public class Proxy implements IProxyCli, Runnable {
 		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
 
 		for (MyFileServerInfo server : knownFileservers) {
+			
+			System.out.println("server online "+server.getAddress());
 			if (server.isOnline()) {
 				onlineservers.put(server, server.getUsage());
 			}

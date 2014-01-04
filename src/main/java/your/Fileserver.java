@@ -11,6 +11,7 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.security.Key;
+import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
@@ -33,6 +34,7 @@ public class Fileserver implements IFileServerCli, Runnable {
 	private ExecutorService threadpool;
 	private Timer aliveTimer;
 	private Key shaKey;
+	private HashMap<String, Integer> version= new HashMap<String, Integer>();
 
 	public static void main(String[] args) throws Exception {
 		ComponentFactory factory = new ComponentFactory(); 
@@ -50,13 +52,14 @@ public class Fileserver implements IFileServerCli, Runnable {
 			shellThread.start();
 		}
 
+		System.out.println("neuer Fileserver");
 		this.shaKey = shaKey;
 		downloadDir = new File(fileserverdir);
-
+		initVersionMap();
 		InetAddress receiverAddress = InetAddress.getByName(proxyhost);
 		aliveSocket = new DatagramSocket();
 		final UDPChannel channel = new UDPChannel(aliveSocket,receiverAddress,proxyudpport);
-
+		
 		//byte[] buf = (tcpport + "\0").getBytes();
 		final AliveMessage msg = new AliveMessage(tcpport);
 		
@@ -150,5 +153,15 @@ public class Fileserver implements IFileServerCli, Runnable {
 
 	public Key getHMACKey() {
 		return shaKey;
+	}
+	private void initVersionMap()
+	{
+		for (File f :downloadDir.listFiles()) {
+			version.put(f.getName(), 0);
+		}
+	}
+	public HashMap<String, Integer> getVersionMap()
+	{
+		return version;
 	}
 }

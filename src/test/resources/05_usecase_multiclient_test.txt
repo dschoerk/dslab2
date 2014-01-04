@@ -6,18 +6,18 @@
 
 proxy:	!users
 
-client:	!login alice 12345
-client:	!credits
+client: !login alice 12345
+client: !credits
 
-proxy:	!users
+proxy: !users
 
-client1:	!login bill 23456
-client1:	!credits
+client1: !login bill 23456
+client1: !credits
 
-proxy:	!users
+proxy: !users
 
-client1:	!upload upload.txt
-client1:	!credits
+client1: !upload upload.txt
+client1: !credits
 
 client:	!download upload.txt
 client:	!credits
@@ -25,5 +25,5 @@ client:	!credits
 
 proxy:	!exit
 client:	!exit
-client1:	!exit
+client1: !exit
 fs1:	!exit

@@ -8,6 +8,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -217,24 +218,64 @@ public class ProxySession implements Runnable, IProxy {
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
 		
+		System.out.println("Download");
+		NumberNR=(int) Math.ceil(parent.getOnlineServer().size()/2.0);
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
-		MyFileServerInfo fileserver = parent.getLeastUsedFileServer();
-
-		if (fileserver == null)
+		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getReadQuorum();
+		if (readQuorum.isEmpty()){
 			return new MessageResponse("No Fileserver available");
-
-		Response r = parent.infoRequest(fileserver, request.getFilename());
+		}
+		
+		boolean filefound=false;
+		Enumeration<MyFileServerInfo> fileserver=readQuorum.elements();
+		MyFileServerInfo server= fileserver.nextElement();
+		int version=-2;
+		try {
+			version = getFileVersionNumber(server,request.getFilename());
+		} catch (ClassNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		while(fileserver.hasMoreElements()){
+			MyFileServerInfo ser= fileserver.nextElement();
+			try {
+				int aktversion=getFileVersionNumber(ser,request.getFilename());
+				if(aktversion!=-1)
+				{
+					filefound=true;
+					if(aktversion>version)
+					{
+						version=aktversion;
+						server=ser;
+					}else if(aktversion==version)
+					{
+						if(ser.getUsage()<server.getUsage())
+							server=ser;
+						
+					}
+				}
+				else
+				{
+					filefound=false;
+				}
+				
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		if(filefound==false && version==-1)
+			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
+		
+		Response r = parent.infoRequest(server, request.getFilename());
 		if(r == null || r instanceof MessageIntegrityErrorResponse)
 		{
-			r = parent.infoRequest(fileserver, request.getFilename());
+			r = parent.infoRequest(server, request.getFilename());
 		}
 		InfoResponse infoResponseObj = (InfoResponse) r;  
 		
-		if (infoResponseObj.getSize() < 0)
-			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
-
 		if (user.getCredits() < infoResponseObj.getSize())
 			return new MessageResponse("Not enough Credits");
 
@@ -242,16 +283,17 @@ public class ProxySession implements Runnable, IProxy {
 				infoResponseObj.getSize());
 
 		DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
-				fileserver.getAddress(), fileserver.getTcpport());
+				server.getAddress(), server.getTcpport());
 
 		user.addCredits(-infoResponseObj.getSize());
+		
 		FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
 		if(file!=null){
 		    file.incDownloadCnt();
 		    parent.getManagementComonent().updateSubscriptions(file);
 		}
 		
-		fileserver.incUsage(infoResponseObj.getSize());
+		server.incUsage(infoResponseObj.getSize());
 
 		DownloadTicketResponse response = new DownloadTicketResponse(ticket);
 		return response;
@@ -264,11 +306,15 @@ public class ProxySession implements Runnable, IProxy {
 		if (user == null)
 			return new MessageResponse("You have to login first");
 		
-		NumberNR=Math.round(parent.getOnlineServer().size()/2);
-		NumberNW=Math.round(parent.getOnlineServer().size()/2)+1;
+		NumberNR=(int) Math.ceil(parent.getOnlineServer().size()/2.0);
+		NumberNW=(int)Math.ceil(parent.getOnlineServer().size()/2.0)+1;
 		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getReadQuorum();
 		ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum=getWriteQuorum();
-		int version=-2;
+		if (readQuorum.isEmpty()){
+			return new MessageResponse("No Fileserver available");
+		}
+		
+		int version=-1;
 		for (MyFileServerInfo server : readQuorum.values()) 
 		{
 			try {
