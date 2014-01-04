@@ -99,9 +99,13 @@ public class ProxySession implements Runnable, IProxy {
 			while (true) {
 
 				Object o = channel_in.read();
-
-
 				Object response = null;
+				
+				if(o == null)
+				{
+					System.out.println("failed to read package");
+				}
+				
 				if (hasArgument.contains(o.getClass())) {
 					response = commandMap.get(o.getClass()).invoke(this, o);
 				} else {
