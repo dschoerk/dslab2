@@ -101,11 +101,6 @@ public class ProxySession implements Runnable, IProxy {
 				Object o = channel_in.read();
 				Object response = null;
 				
-				if(o == null)
-				{
-					System.out.println("failed to read package");
-				}
-				
 				if (hasArgument.contains(o.getClass())) {
 					response = commandMap.get(o.getClass()).invoke(this, o);
 				} else {
@@ -135,7 +130,6 @@ public class ProxySession implements Runnable, IProxy {
 
 	@Override
 	public LoginResponse login(LoginRequest lr) throws IOException {
-
 		User user = users.getUser(lr.getUsername());
 		PublicKey key = parent.getUserKey(lr.getUsername());
 		channel_out = new RSAChannel(base_channel, key, Cipher.ENCRYPT_MODE);
