@@ -320,6 +320,8 @@ public class Proxy implements IProxyCli, Runnable {
 			if (res == null || res instanceof MessageIntegrityErrorResponse) {
 				// Try again if failed
 				res = uploadRequest(info, version, server);
+				
+				//TODO: what todo if upload fails 2 times ?
 			}
 		}
 	}

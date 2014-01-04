@@ -9,10 +9,12 @@ public class TCPChannel extends Channel {
 
 	private DataInputStream is;
 	private DataOutputStream os;
+	private Socket socket;
 
 	public TCPChannel(Socket socket) throws IOException {
 		is = new DataInputStream(socket.getInputStream());
 		os = new DataOutputStream(socket.getOutputStream());
+		this.socket = socket;
 	}
 
 	@Override
@@ -35,5 +37,6 @@ public class TCPChannel extends Channel {
 	public void close() throws IOException {
 		is.close();
 		os.close();
+		socket.close();
 	}
 }

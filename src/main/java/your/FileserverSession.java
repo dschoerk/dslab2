@@ -73,6 +73,12 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		try {
 			Object o = channel.read();
+			
+			if(!(o instanceof DownloadFileRequest || o instanceof HMACWrapped))
+			{
+				System.err.println("TODO: wrap request > " + o.toString());
+			}
+			
 			Object response = null;
 			if (hasArgument.contains(o.getClass())) {
 				response = commandMap.get(o.getClass()).invoke(this, o);
@@ -153,6 +159,8 @@ public class FileserverSession implements IFileServer, Runnable {
 	@Override
 	public MessageResponse upload(UploadRequest request) throws IOException {
 
+		System.out.println("UPLOADED");
+		
 		try {
 			FileOutputStream fos = new FileOutputStream(parent.getDownloadDirectory().getAbsolutePath() + "/"
 					+ request.getFilename());
