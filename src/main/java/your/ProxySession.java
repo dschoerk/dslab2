@@ -210,8 +210,30 @@ public class ProxySession implements Runnable, IProxy {
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
+		if(parent.getOnlineServer().isEmpty())
+		{
+			return new MessageResponse("No Fileserver available");
+		}
+		System.out.println("ListRequest");
 		Set<String> fileNames = new HashSet<String>();
-		fileNames.addAll(parent.getFiles().keySet());
+		
+		for(MyFileServerInfo ser : parent.getOnlineServer().keySet())
+		{
+			// Ask the Fileserver what files he has
+			TCPChannel listRequest = new TCPChannel(ser.createSocket());
+			ListRequest listRequestObj = new ListRequest();
+			listRequest.write(listRequestObj);
+			ListResponse listResponseObj=null;
+			try {
+				listResponseObj = (ListResponse) listRequest.read();
+			} catch (ClassNotFoundException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			listRequest.close();
+			fileNames.addAll(listResponseObj.getFileNames());
+		}
+
 		return new ListResponse(fileNames);
 	}
 
