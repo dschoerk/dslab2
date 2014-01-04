@@ -150,6 +150,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public LoginResponse login(String username, String password) throws IOException {
 
+		//System.err.println("client login 1 ");
+		if(loggedin)
+			return new LoginResponse(Type.SUCCESS);
+		
 		Key privk = getUserKey(username, password); // read private key for
 													// username
 		rsaChannelFromProxy = new RSAChannel(base_channel, privk, Cipher.DECRYPT_MODE);
@@ -164,7 +168,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 		Object response;
 		try {
 			rsaChannelToProxy.write(message);
-			response = (LoginMessageOk) rsaChannelFromProxy.read();
+			response = rsaChannelFromProxy.read();
+			if(!(response instanceof LoginMessageOk))
+				return new LoginResponse(Type.WRONG_CREDENTIALS);
+			
 			LoginMessageOk msg_2nd = (LoginMessageOk) response;
 
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
