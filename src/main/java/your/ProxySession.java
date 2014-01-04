@@ -325,6 +325,9 @@ public class ProxySession implements Runnable, IProxy {
 			return new MessageResponse("No Fileserver available");
 		}	
 		int version=-1;
+		
+		System.err.println("read: "+readQuorum.values().size()+" write: "+writeQuorum.values().size());
+		
 		for (MyFileServerInfo server : readQuorum.values()) 
 		{
 			try {
@@ -380,14 +383,14 @@ public class ProxySession implements Runnable, IProxy {
 	{
 		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
 		
+		int i=0;
 		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
 		{	
-			int i=0;
-			while(i<NumberNW)
-			{
+			if(i<NumberNW)
 				writeQuorum.put(server.getUsage(), server);
-				i++;
-			}
+			else
+				break;
+			i++;
 		}
 		return writeQuorum;
 	}
