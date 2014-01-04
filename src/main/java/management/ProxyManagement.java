@@ -41,14 +41,14 @@ public class ProxyManagement extends UnicastRemoteObject implements
 
     @Override
     public int getReadQuorum() throws RemoteException {
-        // TODO Auto-generated method stub
-        return 1;
+        
+        return (int) Math.ceil(parent.getOnlineServer().size()/2.0);
     }
 
     @Override
     public int getWriteQuorum() throws RemoteException {
-        // TODO Auto-generated method stub
-        return 2;
+
+        return (int) (Math.ceil(parent.getOnlineServer().size()/2.0)+1);
     }
 
     @Override
@@ -96,7 +96,7 @@ public class ProxyManagement extends UnicastRemoteObject implements
 
     @Override
     public char[] getProxyPublicKey() throws RemoteException {
-        // TODO Auto-generated method stub
+        
         return null;
     }
 

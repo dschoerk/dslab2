@@ -24,6 +24,9 @@
 				<include name="*.properties" />
 			</fileset>
 			<fileset dir="${test.resources.dir}">
+				<include name="*.properties" />
+			</fileset>
+			<fileset dir="${test.resources.dir}">
 				<include name="*.txt" />
 			</fileset>
 		</copy>
@@ -68,6 +71,10 @@
 		<java classname="your.Client" fork="true" classpathref="project.classpath">
 			<arg value="client1.properties" />
 		</java>
+	</target>
+	
+	<target name="run-benchmark" depends="compile" description="Run benchmark.">
+		<java classname="benchmark.Test" fork="true" classpathref="project.classpath" />
 	</target>
 
 	<target name="clean" description="Clean build products.">
