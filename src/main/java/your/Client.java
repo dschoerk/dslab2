@@ -74,6 +74,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 	private File downloadDirectory;
 	private File keyDir;
+	private boolean loggedin;
 
 	MessageInterface managementComponent;
 
@@ -95,14 +96,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		this.downloadDirectory = downloadDir;
 		this.keyDir = keyDir;
+		loggedin = false;
 
 		try {
 			socket = new Socket(host, port);
 			base_channel = new Base64Channel(new TCPChannel(socket));
 			rsaChannelToProxy = new RSAChannel(base_channel, pubk, Cipher.ENCRYPT_MODE);
-			// out = new ObjectOutputStream(socket.getOutputStream());
-			// out.flush();
-			// in = new ObjectInputStream(socket.getInputStream());
 
 			Config cfg_mc = new Config("mc");
 			Registry registry = LocateRegistry.getRegistry(cfg_mc.getString("proxy.host"),
@@ -178,6 +177,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 			response = aes_channel.read();
 			LoginResponse loginresponse = (LoginResponse) response;
+			
+			if(loginresponse.getType() == Type.SUCCESS)
+				loggedin = true;
+			
 			return loginresponse;
 
 		} catch (ClassNotFoundException e) {
@@ -194,6 +197,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public Response credits() throws IOException {
 
+		if(!loggedin)
+			return new MessageResponse("Login first");
+		
 		CreditsRequest message = new CreditsRequest();
 
 		Response response;
@@ -218,6 +224,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public Response buy(long credits) throws IOException {
+		
+		if(!loggedin)
+			return new MessageResponse("Login first");
+		
 		BuyRequest message = new BuyRequest(credits);
 
 		Object response;
@@ -237,7 +247,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public Response list() throws IOException {
-
+		
+		if(!loggedin)
+			return new MessageResponse("Login first");
+		
 		ListRequest req = new ListRequest();
 
 		Response response;
@@ -259,6 +272,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public Response download(String filename) throws IOException {
 
+		if(!loggedin)
+			return new MessageResponse("Login first");
+		
 		DownloadTicketRequest message = new DownloadTicketRequest(filename);
 		Object response = null;
 		try {
@@ -299,6 +315,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public MessageResponse upload(String filename) throws IOException {
+		
+		if(!loggedin)
+			return new MessageResponse("Login first");
+		
 		File f = new File(downloadDirectory.getAbsolutePath() + "/" + filename);
 		if (!f.exists())
 			return new MessageResponse("file does not exist");
@@ -326,8 +346,14 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public MessageResponse logout() throws IOException {
+		
+		if(!loggedin)
+			return new MessageResponse("Login first");
+		
 		LogoutRequest message = new LogoutRequest();
 		aes_channel.write(message);
+		
+		loggedin = false;
 
 		// muss gelesen werden!
 		try {
