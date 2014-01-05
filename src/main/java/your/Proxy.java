@@ -331,12 +331,10 @@ public class Proxy implements IProxyCli, Runnable {
 
 	private Response uploadRequest(FileInfo info, int version, MyFileServerInfo server) {
 
-		// Socket s = null;
 		Channel req = null;
 		try {
 			req = new HMACChannel(createFsChannel(server.createSocket()), hmac);
 			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
-			// HMACWrapped wrap = new HMACWrapped(requestObj, hmac);
 			req.write(requestObj);
 			return (Response) req.read();
 
@@ -439,5 +437,20 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 
 		return infoResponseObj;
+	}
+
+	public ListResponse getFileList(MyFileServerInfo ser) throws IOException {
+		Channel listRequest = new HMACChannel(new TCPChannel(ser.createSocket()), hmac);
+		ListRequest listRequestObj = new ListRequest();
+		listRequest.write(listRequestObj);
+		ListResponse listResponseObj = null;
+		try {
+			listResponseObj = (ListResponse) listRequest.read();
+		} catch (ClassNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		listRequest.close();
+		return listResponseObj;
 	}
 }

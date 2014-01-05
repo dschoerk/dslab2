@@ -6,6 +6,8 @@ import java.security.MessageDigest;
 
 import javax.crypto.Mac;
 
+import org.bouncycastle.util.encoders.Base64;
+
 public class HMACWrapped implements Serializable {
 
 	private static final long serialVersionUID = 3599128059842422585L;
@@ -15,19 +17,19 @@ public class HMACWrapped implements Serializable {
 	public HMACWrapped(Object o, Mac hmac) throws IOException
 	{
 		byte [] enc = Serializer.encode(o);
-		checksum = hmac.doFinal(enc);
+		checksum = Base64.encode(hmac.doFinal(enc));
 		object = enc;
 	}
 	
 	public HMACWrapped(byte [] obj, byte [] checksum)
 	{
 		this.object = obj;
-		this.checksum = checksum;
+		this.checksum = Base64.encode(checksum);
 	}
 	
 	public boolean isChecksumCorrect(Mac hmac)
 	{
-		return MessageDigest.isEqual(checksum, hmac.doFinal(object));
+		return MessageDigest.isEqual(checksum, Base64.encode(hmac.doFinal(object)));
 	}
 	
 	public Object getObject() throws IOException

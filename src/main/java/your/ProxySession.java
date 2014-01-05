@@ -25,12 +25,10 @@ import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
 import message.request.DownloadTicketRequest;
-import message.request.InfoRequest;
 import message.request.ListRequest;
 import message.request.LoginRequest;
 import message.request.LogoutRequest;
 import message.request.UploadRequest;
-import message.request.VersionRequest;
 import message.response.BuyResponse;
 import message.response.CreditsResponse;
 import message.response.DownloadTicketResponse;
@@ -40,12 +38,10 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageIntegrityErrorResponse;
 import message.response.MessageResponse;
-import message.response.VersionResponse;
 import model.DownloadTicket;
 import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
-import networkio.HMACChannel;
 import networkio.RSAChannel;
 import networkio.TCPChannel;
 
@@ -208,17 +204,8 @@ public class ProxySession implements Runnable, IProxy {
 
 		for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
 			// Ask the Fileserver what files he has
-			TCPChannel listRequest = new TCPChannel(ser.createSocket());
-			ListRequest listRequestObj = new ListRequest();
-			listRequest.write(listRequestObj);
-			ListResponse listResponseObj = null;
-			try {
-				listResponseObj = (ListResponse) listRequest.read();
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			listRequest.close();
+			
+			ListResponse listResponseObj = parent.getFileList(ser);
 			fileNames.addAll(listResponseObj.getFileNames());
 		}
 		return new ListResponse(fileNames);
