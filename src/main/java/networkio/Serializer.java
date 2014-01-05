@@ -35,13 +35,21 @@ public class Serializer {
 		}
 	}
 
-	public static Object decode(byte[] data) throws IOException, ClassNotFoundException {
+	public static Object decode(byte[] data) throws IOException {
+
+		if (data == null)
+			return null;
+
 		ByteArrayInputStream bis = new ByteArrayInputStream(data);
 		ObjectInput in = null;
 		try {
 			in = new ObjectInputStream(bis);
 			Object o = in.readObject();
 			return o;
+		} catch (ClassNotFoundException e) {
+			// does not happen
+			e.printStackTrace();
+			return null;
 		} finally {
 			try {
 				bis.close();

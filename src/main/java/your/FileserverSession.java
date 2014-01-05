@@ -180,13 +180,17 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	}
 
-	public Response hmacwrapped(HMACWrapped obj) {
-		System.out.println("received hmac wrapped");
+	public Response hmacwrapped(HMACWrapped obj) throws IOException {
+		
 		System.out.println("checksum correct: " + obj.isChecksumCorrect(hmac));
 
+		channel = mactcpchannel;
+		
 		if (!obj.isChecksumCorrect(hmac))
 			return new MessageIntegrityErrorResponse();
-
+		
+		System.out.println("received hmac wrapped "+ obj.getObject().toString());
+		
 		try {
 			Object o = obj.getObject();
 			Object response = null;
@@ -195,9 +199,6 @@ public class FileserverSession implements IFileServer, Runnable {
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
-			
-			channel = mactcpchannel;
-
 			return (Response) response;
 
 		} catch (IOException e) {

@@ -1,12 +1,14 @@
 package networkio;
 
 import java.io.IOException;
-import java.security.InvalidKeyException;
-import java.security.Key;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
+import java.io.StreamCorruptedException;
+import java.util.Random;
 
 import javax.crypto.Mac;
+
+import org.bouncycastle.util.encoders.Base64;
+
+import message.response.MessageIntegrityErrorResponse;
 
 public class HMACChannel extends Channel {
 
@@ -22,8 +24,15 @@ public class HMACChannel extends Channel {
 
 	@Override
 	public void write(byte[] data) throws IOException {
-		
-		HMACWrapped w = new HMACWrapped(data, hMac.doFinal(data));
+
+		byte[] hash = hMac.doFinal(Serializer.decode(data).toString().getBytes());
+
+		// simulate error
+		if (0 == new Random().nextInt(9)) {
+			data[0] = 0;
+		}
+
+		HMACWrapped w = new HMACWrapped(data, hash);
 		parent.write(Serializer.encode(w));
 	}
 
@@ -31,9 +40,21 @@ public class HMACChannel extends Channel {
 	public byte[] readBytes() throws ClassNotFoundException, IOException {
 
 		byte[] data = parent.readBytes();
-		HMACWrapped w = (HMACWrapped)Serializer.decode(data);
-		correctChecksum = w.isChecksumCorrect(hMac);
-		return Serializer.encode(w.getObject());
+
+		Object response;
+		try {
+			HMACWrapped w = (HMACWrapped) Serializer.decode(data);
+			correctChecksum = w.isChecksumCorrect(hMac);
+			response = w.getObject();
+
+			if (!correctChecksum)
+				response = new MessageIntegrityErrorResponse();
+		} catch (StreamCorruptedException e) {
+			response = new MessageIntegrityErrorResponse();
+		}
+
+		return Serializer.encode(response);
+
 	}
 
 	public boolean isChecksumCorrect() {

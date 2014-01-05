@@ -17,11 +17,9 @@ import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,26 +30,24 @@ import javax.crypto.Mac;
 
 import management.ProxyManagement;
 import message.AliveMessage;
+import message.Request;
 import message.Response;
-import message.request.DownloadFileRequest;
 import message.request.InfoRequest;
 import message.request.ListRequest;
 import message.request.UploadRequest;
 import message.request.VersionRequest;
-import message.response.DownloadFileResponse;
-import message.response.MessageIntegrityErrorResponse;
 import message.response.FileServerInfoResponse;
 import message.response.InfoResponse;
 import message.response.ListResponse;
+import message.response.MessageIntegrityErrorResponse;
 import message.response.MessageResponse;
 import message.response.UserInfoResponse;
 import message.response.VersionResponse;
-import model.DownloadTicket;
 import model.FileServerInfo;
 import model.UserInfo;
 import networkio.Channel;
 import networkio.HMACChannel;
-import networkio.HMACWrapped;
+import networkio.RequestFailedException;
 import networkio.TCPChannel;
 import networkio.UDPChannel;
 
@@ -356,17 +352,6 @@ public class Proxy implements IProxyCli, Runnable {
 		return null;
 	}
 
-	public int getFileVersionNumber(MyFileServerInfo server, String filename) throws IOException,
-			ClassNotFoundException {
-		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
-		VersionRequest versionRequestObj = new VersionRequest(filename);
-		versionRequest.write(versionRequestObj);
-		VersionResponse versionResponseObj = (VersionResponse) versionRequest.read();
-		versionRequest.close();
-
-		return versionResponseObj.getVersion();
-	}
-
 	public Map<String, FileInfo> getFiles() {
 		return knownFiles;
 	}
@@ -410,47 +395,27 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 		return onlineservers;
 	}
-
-	public Response infoRequest(MyFileServerInfo fileserver, String filename) {
-		Response infoResponseObj = null;
-		Channel infoRequest = null;
+	
+	public <T extends Response> T retryableRequest(MyFileServerInfo server, Request req, int retryCounter, Class<? extends Response> responseClass) throws IOException,
+			RequestFailedException
+	{
+		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
+		versionRequest.write(req);
 		try {
-			InfoRequest infoRequestObj = new InfoRequest(filename);
-			infoRequest = new HMACChannel(new TCPChannel(fileserver.createSocket()), hmac);
-			infoRequest.write(infoRequestObj);
-			try {
-				infoResponseObj = (Response) infoRequest.read();
-			} catch (ClassNotFoundException e) {
-				// does not happen
-				e.printStackTrace();
-			}
+			return (T)responseClass.cast(versionRequest.read());
 
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		} finally {
-			try {
-				infoRequest.close();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-
-		return infoResponseObj;
-	}
-
-	public ListResponse getFileList(MyFileServerInfo ser) throws IOException {
-		Channel listRequest = new HMACChannel(new TCPChannel(ser.createSocket()), hmac);
-		ListRequest listRequestObj = new ListRequest();
-		listRequest.write(listRequestObj);
-		ListResponse listResponseObj = null;
-		try {
-			listResponseObj = (ListResponse) listRequest.read();
+		} catch (ClassCastException e) {
+			// we received a wrong object, try again
+			if (retryCounter > 0)
+				return retryableRequest(server, req, retryCounter - 1, responseClass);
+			else
+				throw new RequestFailedException();
 		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
+			// does not happen
 			e.printStackTrace();
+			return null;
+		} finally {
+			versionRequest.close();
 		}
-		listRequest.close();
-		return listResponseObj;
 	}
 }

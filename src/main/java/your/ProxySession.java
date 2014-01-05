@@ -25,10 +25,12 @@ import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
 import message.request.DownloadTicketRequest;
+import message.request.InfoRequest;
 import message.request.ListRequest;
 import message.request.LoginRequest;
 import message.request.LogoutRequest;
 import message.request.UploadRequest;
+import message.request.VersionRequest;
 import message.response.BuyResponse;
 import message.response.CreditsResponse;
 import message.response.DownloadTicketResponse;
@@ -38,11 +40,13 @@ import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
 import message.response.MessageIntegrityErrorResponse;
 import message.response.MessageResponse;
+import message.response.VersionResponse;
 import model.DownloadTicket;
 import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
 import networkio.RSAChannel;
+import networkio.RequestFailedException;
 import networkio.TCPChannel;
 
 import org.bouncycastle.util.encoders.Base64;
@@ -197,46 +201,50 @@ public class ProxySession implements Runnable, IProxy {
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
-		if (parent.getOnlineServer().isEmpty()) {
-			return new MessageResponse("No Fileserver available");
-		}
-		Set<String> fileNames = new HashSet<String>();
+		try {
 
-		for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
-			// Ask the Fileserver what files he has
-			
-			ListResponse listResponseObj = parent.getFileList(ser);
-			fileNames.addAll(listResponseObj.getFileNames());
+			if (parent.getOnlineServer().isEmpty()) {
+				return new MessageResponse("No Fileserver available");
+			}
+			Set<String> fileNames = new HashSet<String>();
+
+			for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
+				// Ask the Fileserver what files he has
+				ListRequest lreq = new ListRequest();
+				ListResponse listResponseObj = parent.retryableRequest(ser, lreq, 1, ListResponse.class);
+				fileNames.addAll(listResponseObj.getFileNames());
+			}
+			return new ListResponse(fileNames);
+
+		} catch (RequestFailedException e) {
+			return new MessageResponse("List Response Failed");
 		}
-		return new ListResponse(fileNames);
 	}
 
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
 
-		NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
-		if (user == null)
-			return new MessageResponse("You have to login first");
-
-		ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
-		if (readQuorum.isEmpty()) {
-			return new MessageResponse("No Fileserver available");
-		}
-
-		boolean filefound = false;
-		Enumeration<MyFileServerInfo> fileserver = readQuorum.elements();
-		MyFileServerInfo server = fileserver.nextElement();
-		int version = -2;
 		try {
-			version = parent.getFileVersionNumber(server, request.getFilename());
-		} catch (ClassNotFoundException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		while (fileserver.hasMoreElements()) {
-			MyFileServerInfo ser = fileserver.nextElement();
-			try {
-				int aktversion = parent.getFileVersionNumber(ser, request.getFilename());
+			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
+			if (user == null)
+				return new MessageResponse("You have to login first");
+
+			ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+			if (readQuorum.isEmpty()) {
+				return new MessageResponse("No Fileserver available");
+			}
+
+			boolean filefound = false;
+			Enumeration<MyFileServerInfo> fileserver = readQuorum.elements();
+			MyFileServerInfo server = fileserver.nextElement();
+			int version = -2;
+
+			VersionRequest vreq = new VersionRequest(request.getFilename());
+			version = ((VersionResponse) (parent.retryableRequest(server, vreq, 1, VersionResponse.class))).getVersion();
+
+			while (fileserver.hasMoreElements()) {
+				MyFileServerInfo ser = fileserver.nextElement();
+				int aktversion = ((VersionResponse) (parent.retryableRequest(ser, vreq, 1, VersionResponse.class))).getVersion();
 				if (aktversion != -1) {
 					filefound = true;
 					if (aktversion > version) {
@@ -249,78 +257,77 @@ public class ProxySession implements Runnable, IProxy {
 				} else {
 					filefound = false;
 				}
-
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
+			if (filefound == false && version == -1)
+				return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
+
+			InfoRequest ireq = new InfoRequest(request.getFilename());
+			InfoResponse infoResponseObj = parent.retryableRequest(server, ireq, 1, InfoResponse.class);
+
+			if (user.getCredits() < infoResponseObj.getSize())
+				return new MessageResponse("Not enough Credits");
+
+			String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), version,
+					infoResponseObj.getSize());
+
+			DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
+					server.getAddress(), server.getTcpport());
+			user.addCredits(-infoResponseObj.getSize());
+
+			/*
+			 * FileInfo file =
+			 * parent.getFiles().get(infoResponseObj.getFilename());
+			 * if(file!=null){ file.incDownloadCnt();
+			 * parent.getManagementComonent().updateSubscriptions(file); }
+			 */
+
+			server.incUsage(infoResponseObj.getSize());
+
+			DownloadTicketResponse response = new DownloadTicketResponse(ticket);
+			return response;
+
+		} catch (RequestFailedException e) {
+			return new MessageResponse("Download Failed");
 		}
-		if (filefound == false && version == -1)
-			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
-
-		Response r = parent.infoRequest(server, request.getFilename());
-		if (r == null || r instanceof MessageIntegrityErrorResponse) {
-			r = parent.infoRequest(server, request.getFilename());
-		}
-		InfoResponse infoResponseObj = (InfoResponse) r;
-
-		if (user.getCredits() < infoResponseObj.getSize())
-			return new MessageResponse("Not enough Credits");
-
-		String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), version,
-				infoResponseObj.getSize());
-
-		DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
-				server.getAddress(), server.getTcpport());
-		user.addCredits(-infoResponseObj.getSize());
-
-		/*
-		 * FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
-		 * if(file!=null){ file.incDownloadCnt();
-		 * parent.getManagementComonent().updateSubscriptions(file); }
-		 */
-
-		server.incUsage(infoResponseObj.getSize());
-
-		DownloadTicketResponse response = new DownloadTicketResponse(ticket);
-		return response;
 	}
 
 	@Override
 	public MessageResponse upload(UploadRequest request) throws IOException {
 		if (user == null)
 			return new MessageResponse("You have to login first");
+		try {
 
-		NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
-		NumberNW = (int) Math.ceil(parent.getOnlineServer().size() / 2.0) + 1;
-		ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
-		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
-		if (readQuorum.isEmpty()) {
-			return new MessageResponse("No Fileserver available");
-		}
-		int version = -1;
-
-		System.err.println("read: " + readQuorum.values().size() + " write: " + writeQuorum.values().size());
-
-		for (MyFileServerInfo server : readQuorum.values()) {
-			try {
-				version = Math.max(parent.getFileVersionNumber(server, request.getFilename()), version);
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
+			NumberNW = (int) Math.ceil(parent.getOnlineServer().size() / 2.0) + 1;
+			ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+			ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
+			if (readQuorum.isEmpty()) {
+				return new MessageResponse("No Fileserver available");
 			}
-		}
+			int version = -1;
 
-		if (version != -1) {
-			version++;
-		} else {
-			version = 1;
-		}
+			System.err.println("read: " + readQuorum.values().size() + " write: " + writeQuorum.values().size());
 
-		FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
-		parent.distributeFile(writeQuorum, info, version);
-		user.addCredits(2 * request.getContent().length);
-		return new MessageResponse("File: " + info.getName() + " has been uploaded");
+			for (MyFileServerInfo server : readQuorum.values()) {
+
+				VersionRequest vreq = new VersionRequest(request.getFilename());
+				version = Math.max(((VersionResponse) (parent.retryableRequest(server, vreq, 1, VersionResponse.class))).getVersion(), version);
+			}
+
+			if (version != -1) {
+				version++;
+			} else {
+				version = 1;
+			}
+
+			FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
+			parent.distributeFile(writeQuorum, info, version);
+			user.addCredits(2 * request.getContent().length);
+			return new MessageResponse("File: " + info.getName() + " has been uploaded");
+
+		} catch (RequestFailedException e) {
+			return new MessageResponse("Upload Failed");
+		}
 	}
 
 	@Override
