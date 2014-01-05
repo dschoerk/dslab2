@@ -45,6 +45,7 @@ import model.DownloadTicket;
 import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
+import networkio.HMACChannel;
 import networkio.RSAChannel;
 import networkio.TCPChannel;
 
@@ -100,16 +101,15 @@ public class ProxySession implements Runnable, IProxy {
 
 				Object o = channel_in.read();
 				Object response = null;
-				
+
 				if (hasArgument.contains(o.getClass())) {
 					response = commandMap.get(o.getClass()).invoke(this, o);
 				} else {
 					response = commandMap.get(o.getClass()).invoke(this);
 				}
 				channel_out.write(response);
-				
-				if(user == null)
-				{
+
+				if (user == null) {
 					channel_in = new RSAChannel(base_channel, parent.getPrivKey(), Cipher.DECRYPT_MODE);
 				}
 			}
@@ -137,31 +137,27 @@ public class ProxySession implements Runnable, IProxy {
 		SecureRandom rand = new SecureRandom();
 		byte[] proxy_challenge = new byte[32];
 		byte[] iv = new byte[16];
-		
+
 		KeyGenerator gen;
 		SecretKey sec_key = null;
 		try {
 			gen = KeyGenerator.getInstance("AES");
 			gen.init(256);
 			sec_key = gen.generateKey();
-			
+
 		} catch (NoSuchAlgorithmException e1) {
 			// may not happen
 			e1.printStackTrace();
-		} 
-		//byte[] sec_key = new byte[32];
+		}
+		// byte[] sec_key = new byte[32];
 		rand.nextBytes(proxy_challenge);
 		rand.nextBytes(iv);
-		//rand.nextBytes(sec_key);
+		// rand.nextBytes(sec_key);
 
-		LoginMessageOk sec = new LoginMessageOk(
-				Base64.encode(lr.getChallenge()), 
-				Base64.encode(proxy_challenge), 
-				Base64.encode(sec_key.getEncoded()), 
-				Base64.encode(iv));
+		LoginMessageOk sec = new LoginMessageOk(Base64.encode(lr.getChallenge()), Base64.encode(proxy_challenge),
+				Base64.encode(sec_key.getEncoded()), Base64.encode(iv));
 		channel_out.write(sec);
 
-		
 		channel_in = new AESChannel(base_channel, sec_key, iv);
 		channel_out = channel_in;
 
@@ -177,8 +173,7 @@ public class ProxySession implements Runnable, IProxy {
 			// TODO Auto-generated catch block
 
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
-		} catch (IOException e)
-		{
+		} catch (IOException e) {
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
 
@@ -206,19 +201,17 @@ public class ProxySession implements Runnable, IProxy {
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
-		if(parent.getOnlineServer().isEmpty())
-		{
+		if (parent.getOnlineServer().isEmpty()) {
 			return new MessageResponse("No Fileserver available");
 		}
 		Set<String> fileNames = new HashSet<String>();
-		
-		for(MyFileServerInfo ser : parent.getOnlineServer().keySet())
-		{
+
+		for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
 			// Ask the Fileserver what files he has
 			TCPChannel listRequest = new TCPChannel(ser.createSocket());
 			ListRequest listRequestObj = new ListRequest();
 			listRequest.write(listRequestObj);
-			ListResponse listResponseObj=null;
+			ListResponse listResponseObj = null;
 			try {
 				listResponseObj = (ListResponse) listRequest.read();
 			} catch (ClassNotFoundException e) {
@@ -233,79 +226,73 @@ public class ProxySession implements Runnable, IProxy {
 
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
-		
-		NumberNR=(int) Math.ceil(parent.getOnlineServer().size()/2.0);
+
+		NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
 		if (user == null)
 			return new MessageResponse("You have to login first");
 
-		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getQuorum(NumberNR);
-		if (readQuorum.isEmpty()){
+		ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+		if (readQuorum.isEmpty()) {
 			return new MessageResponse("No Fileserver available");
 		}
-		
-		boolean filefound=false;
-		Enumeration<MyFileServerInfo> fileserver=readQuorum.elements();
-		MyFileServerInfo server= fileserver.nextElement();
-		int version=-2;
+
+		boolean filefound = false;
+		Enumeration<MyFileServerInfo> fileserver = readQuorum.elements();
+		MyFileServerInfo server = fileserver.nextElement();
+		int version = -2;
 		try {
-			version = getFileVersionNumber(server,request.getFilename());
+			version = parent.getFileVersionNumber(server, request.getFilename());
 		} catch (ClassNotFoundException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		while(fileserver.hasMoreElements()){
-			MyFileServerInfo ser= fileserver.nextElement();
+		while (fileserver.hasMoreElements()) {
+			MyFileServerInfo ser = fileserver.nextElement();
 			try {
-				int aktversion=getFileVersionNumber(ser,request.getFilename());
-				if(aktversion!=-1)
-				{
-					filefound=true;
-					if(aktversion>version)
-					{
-						version=aktversion;
-						server=ser;
-					}else if(aktversion==version)
-					{
-						if(ser.getUsage()<server.getUsage())
-							server=ser;		
+				int aktversion = parent.getFileVersionNumber(ser, request.getFilename());
+				if (aktversion != -1) {
+					filefound = true;
+					if (aktversion > version) {
+						version = aktversion;
+						server = ser;
+					} else if (aktversion == version) {
+						if (ser.getUsage() < server.getUsage())
+							server = ser;
 					}
+				} else {
+					filefound = false;
 				}
-				else
-				{
-					filefound=false;
-				}
-				
+
 			} catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
-		if(filefound==false && version==-1)
+		if (filefound == false && version == -1)
 			return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
-		
+
 		Response r = parent.infoRequest(server, request.getFilename());
-		if(r == null || r instanceof MessageIntegrityErrorResponse)
-		{
+		if (r == null || r instanceof MessageIntegrityErrorResponse) {
 			r = parent.infoRequest(server, request.getFilename());
 		}
-		InfoResponse infoResponseObj = (InfoResponse) r;  
-		
+		InfoResponse infoResponseObj = (InfoResponse) r;
+
 		if (user.getCredits() < infoResponseObj.getSize())
 			return new MessageResponse("Not enough Credits");
 
 		String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), version,
 				infoResponseObj.getSize());
-	
+
 		DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
 				server.getAddress(), server.getTcpport());
 		user.addCredits(-infoResponseObj.getSize());
-		
-		/*FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
-		if(file!=null){
-		    file.incDownloadCnt();
-		    parent.getManagementComonent().updateSubscriptions(file);
-		}*/
-		
+
+		/*
+		 * FileInfo file = parent.getFiles().get(infoResponseObj.getFilename());
+		 * if(file!=null){ file.incDownloadCnt();
+		 * parent.getManagementComonent().updateSubscriptions(file); }
+		 */
+
 		server.incUsage(infoResponseObj.getSize());
 
 		DownloadTicketResponse response = new DownloadTicketResponse(ticket);
@@ -316,77 +303,63 @@ public class ProxySession implements Runnable, IProxy {
 	public MessageResponse upload(UploadRequest request) throws IOException {
 		if (user == null)
 			return new MessageResponse("You have to login first");
-		
-		NumberNR=(int) Math.ceil(parent.getOnlineServer().size()/2.0);
-		NumberNW=(int)Math.ceil(parent.getOnlineServer().size()/2.0)+1;
-		ConcurrentHashMap<Long,MyFileServerInfo> readQuorum=getQuorum(NumberNR);
-		ConcurrentHashMap<Long,MyFileServerInfo> writeQuorum=getQuorum(NumberNW);
-		if (readQuorum.isEmpty()){
+
+		NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
+		NumberNW = (int) Math.ceil(parent.getOnlineServer().size() / 2.0) + 1;
+		ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
+		if (readQuorum.isEmpty()) {
 			return new MessageResponse("No Fileserver available");
-		}	
-		int version=-1;
-		
-		System.err.println("read: "+readQuorum.values().size()+" write: "+writeQuorum.values().size());
-		
-		for (MyFileServerInfo server : readQuorum.values()) 
-		{
+		}
+		int version = -1;
+
+		System.err.println("read: " + readQuorum.values().size() + " write: " + writeQuorum.values().size());
+
+		for (MyFileServerInfo server : readQuorum.values()) {
 			try {
-				version=Math.max(getFileVersionNumber(server,request.getFilename()), version);
+				version = Math.max(parent.getFileVersionNumber(server, request.getFilename()), version);
 			} catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
 		}
 
-		if(version!=-1)
-		{
+		if (version != -1) {
 			version++;
-		}
-		else{
-			version=1;
+		} else {
+			version = 1;
 		}
 
 		FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
-		parent.distributeFile(writeQuorum,info,version);
+		parent.distributeFile(writeQuorum, info, version);
 		user.addCredits(2 * request.getContent().length);
 		return new MessageResponse("File: " + info.getName() + " has been uploaded");
 	}
 
 	@Override
 	public MessageResponse logout() throws IOException {
-	    if(user!=null) parent.getManagementComonent().removeSubscriptions(user.getName());
+		if (user != null)
+			parent.getManagementComonent().removeSubscriptions(user.getName());
 		user = null;
 		return new MessageResponse("User logged out");
 	}
+
 	public User getUser() {
 		return user;
 	}
-	
-	private ConcurrentHashMap<Long, MyFileServerInfo> getQuorum(int quorumSize)
-	{
+
+	private ConcurrentHashMap<Long, MyFileServerInfo> getQuorum(int quorumSize) {
 		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
-		
-		int i=0;
-		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) 
-		{	
-			if(i<quorumSize)
+
+		int i = 0;
+		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) {
+			if (i < quorumSize)
 				writeQuorum.put(server.getUsage(), server);
 			else
 				break;
 			i++;
 		}
 		return writeQuorum;
-	}
-	
-	private int getFileVersionNumber(MyFileServerInfo server, String filename) throws IOException, ClassNotFoundException
-	{
-		TCPChannel versionRequest = new TCPChannel(	server.createSocket());
-		VersionRequest versionRequestObj = new VersionRequest(filename);
-		versionRequest.write(versionRequestObj);
-		VersionResponse versionResponseObj = (VersionResponse) versionRequest.read();
-		versionRequest.close();
-			
-		return versionResponseObj.getVersion();
 	}
 
 	static {

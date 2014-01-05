@@ -37,6 +37,7 @@ import message.request.DownloadFileRequest;
 import message.request.InfoRequest;
 import message.request.ListRequest;
 import message.request.UploadRequest;
+import message.request.VersionRequest;
 import message.response.DownloadFileResponse;
 import message.response.MessageIntegrityErrorResponse;
 import message.response.FileServerInfoResponse;
@@ -44,6 +45,7 @@ import message.response.InfoResponse;
 import message.response.ListResponse;
 import message.response.MessageResponse;
 import message.response.UserInfoResponse;
+import message.response.VersionResponse;
 import model.DownloadTicket;
 import model.FileServerInfo;
 import model.UserInfo;
@@ -303,6 +305,7 @@ public class Proxy implements IProxyCli, Runnable {
 			return null;
 		}
 	}
+
 	private Channel createFsChannel(Socket s) throws IOException {
 		return new TCPChannel(s);
 	}
@@ -320,21 +323,21 @@ public class Proxy implements IProxyCli, Runnable {
 			if (res == null || res instanceof MessageIntegrityErrorResponse) {
 				// Try again if failed
 				res = uploadRequest(info, version, server);
-				
-				//TODO: what todo if upload fails 2 times ?
+
+				// TODO: what todo if upload fails 2 times ?
 			}
 		}
 	}
 
 	private Response uploadRequest(FileInfo info, int version, MyFileServerInfo server) {
-		
-		Socket s = null;
+
+		// Socket s = null;
+		Channel req = null;
 		try {
-			s = server.createSocket();
-			Channel req = createFsChannel(s);
+			req = new HMACChannel(createFsChannel(server.createSocket()), hmac);
 			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
-			HMACWrapped wrap = new HMACWrapped(requestObj, hmac);
-			req.write(wrap);
+			// HMACWrapped wrap = new HMACWrapped(requestObj, hmac);
+			req.write(requestObj);
 			return (Response) req.read();
 
 		} catch (IOException e) {
@@ -343,10 +346,9 @@ public class Proxy implements IProxyCli, Runnable {
 		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} finally
-		{
+		} finally {
 			try {
-				s.close();
+				req.close();
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -354,6 +356,17 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 
 		return null;
+	}
+
+	public int getFileVersionNumber(MyFileServerInfo server, String filename) throws IOException,
+			ClassNotFoundException {
+		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
+		VersionRequest versionRequestObj = new VersionRequest(filename);
+		versionRequest.write(versionRequestObj);
+		VersionResponse versionResponseObj = (VersionResponse) versionRequest.read();
+		versionRequest.close();
+
+		return versionResponseObj.getVersion();
 	}
 
 	public Map<String, FileInfo> getFiles() {
@@ -388,12 +401,12 @@ public class Proxy implements IProxyCli, Runnable {
 
 	public HashMap<MyFileServerInfo, Long> getOnlineServer() {
 		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
-		List<MyFileServerInfo> copyknownFileservers= Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
+		List<MyFileServerInfo> copyknownFileservers = Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
 		copyknownFileservers.addAll(knownFileservers);
-		
+
 		while (!copyknownFileservers.isEmpty()) {
-		
-			MyFileServerInfo minimumUsedServer= MyFileServerInfo.minimumUsage(copyknownFileservers);
+
+			MyFileServerInfo minimumUsedServer = MyFileServerInfo.minimumUsage(copyknownFileservers);
 			onlineservers.put(minimumUsedServer, minimumUsedServer.getUsage());
 			copyknownFileservers.remove(minimumUsedServer);
 		}
@@ -402,10 +415,10 @@ public class Proxy implements IProxyCli, Runnable {
 
 	public Response infoRequest(MyFileServerInfo fileserver, String filename) {
 		Response infoResponseObj = null;
+		Channel infoRequest = null;
 		try {
-			Socket s = fileserver.createSocket();
 			InfoRequest infoRequestObj = new InfoRequest(filename);
-			Channel infoRequest = new TCPChannel(s);
+			infoRequest = new HMACChannel(new TCPChannel(fileserver.createSocket()), hmac);
 			infoRequest.write(infoRequestObj);
 			try {
 				infoResponseObj = (Response) infoRequest.read();
@@ -413,10 +426,16 @@ public class Proxy implements IProxyCli, Runnable {
 				// does not happen
 				e.printStackTrace();
 			}
-			s.close();
+
 		} catch (IOException e1) {
-			// TODO Auto-generated catch block
 			e1.printStackTrace();
+		} finally {
+			try {
+				infoRequest.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 
 		return infoResponseObj;

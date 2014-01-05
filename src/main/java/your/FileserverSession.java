@@ -29,6 +29,7 @@ import message.response.MessageResponse;
 import message.response.VersionResponse;
 import model.DownloadTicket;
 import networkio.Channel;
+import networkio.HMACChannel;
 import networkio.HMACWrapped;
 import networkio.TCPChannel;
 import server.IFileServer;
@@ -40,6 +41,8 @@ public class FileserverSession implements IFileServer, Runnable {
 	private Fileserver parent;
 
 	private Mac hmac;
+	private Channel tcpchannel;
+	private Channel mactcpchannel;
 	private Channel channel;
 	private HashMap<String, Integer> version= new HashMap<String, Integer>();
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
@@ -62,7 +65,8 @@ public class FileserverSession implements IFileServer, Runnable {
 		}
 
 		try {
-			channel = new TCPChannel(socket);
+			tcpchannel = new TCPChannel(socket);
+			mactcpchannel = new HMACChannel(tcpchannel, hmac);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -72,19 +76,21 @@ public class FileserverSession implements IFileServer, Runnable {
 	public void run() {
 
 		try {
-			Object o = channel.read();
+			Object o = tcpchannel.read();
 			
 			if(!(o instanceof DownloadFileRequest || o instanceof HMACWrapped))
 			{
 				System.err.println("TODO: wrap request > " + o.toString());
 			}
 			
+			channel = tcpchannel;
 			Object response = null;
 			if (hasArgument.contains(o.getClass())) {
 				response = commandMap.get(o.getClass()).invoke(this, o);
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
+			
 			channel.write(response);
 
 		} catch (ClassNotFoundException e) {
@@ -189,6 +195,8 @@ public class FileserverSession implements IFileServer, Runnable {
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
+			
+			channel = mactcpchannel;
 
 			return (Response) response;
 
