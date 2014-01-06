@@ -258,20 +258,17 @@ public class Proxy implements IProxyCli, Runnable {
 						AliveMessage msg = (AliveMessage) hmacchannel.read();
 						int port = msg.getPort();
 						
-						System.out.println(port);
-						
 						DatagramPacket p = udpchannel.getLatestPacket();
 						MyFileServerInfo server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
-						
-						if (!knownFileservers.contains(server)) {
+						server = findServer(server);
+						if (server == null) {
+						    server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
 							knownFileservers.add(server);
 							System.out.println("add");
 						}
 
 						server.setAlive();
 						// server.updateOnlineStatus(3000);
-
-						System.out.println("knownfileserver:" + knownFileservers.size());
 
 					} catch (ClassCastException e) {
 						System.err.println("class cast err");
