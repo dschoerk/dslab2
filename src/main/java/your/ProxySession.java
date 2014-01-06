@@ -113,8 +113,6 @@ public class ProxySession implements Runnable, IProxy {
 					channel_in = new RSAChannel(base_channel, parent.getPrivKey(), Cipher.DECRYPT_MODE);
 				}
 			}
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
 		} catch (IOException e) {
 			// running = false;
 		} catch (IllegalAccessException e) {
@@ -169,10 +167,6 @@ public class ProxySession implements Runnable, IProxy {
 			if (!Arrays.equals(solved_challenge, proxy_challenge))
 				return new LoginResponse(Type.WRONG_CREDENTIALS);
 
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-
-			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		} catch (IOException e) {
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
@@ -211,7 +205,7 @@ public class ProxySession implements Runnable, IProxy {
 			for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
 				// Ask the Fileserver what files he has
 				ListRequest lreq = new ListRequest();
-				ListResponse listResponseObj = parent.retryableRequest(ser, lreq, 1, ListResponse.class);
+				ListResponse listResponseObj = parent.retryableRequestToFileserver(ser, lreq, 1, ListResponse.class);
 				fileNames.addAll(listResponseObj.getFileNames());
 			}
 			return new ListResponse(fileNames);
@@ -240,11 +234,11 @@ public class ProxySession implements Runnable, IProxy {
 			int version = -2;
 
 			VersionRequest vreq = new VersionRequest(request.getFilename());
-			version = ((VersionResponse) (parent.retryableRequest(server, vreq, 1, VersionResponse.class))).getVersion();
+			version = ((VersionResponse) (parent.retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion();
 
 			while (fileserver.hasMoreElements()) {
 				MyFileServerInfo ser = fileserver.nextElement();
-				int aktversion = ((VersionResponse) (parent.retryableRequest(ser, vreq, 1, VersionResponse.class))).getVersion();
+				int aktversion = ((VersionResponse) (parent.retryableRequestToFileserver(ser, vreq, 1, VersionResponse.class))).getVersion();
 				if (aktversion != -1) {
 					filefound = true;
 					if (aktversion > version) {
@@ -262,7 +256,7 @@ public class ProxySession implements Runnable, IProxy {
 				return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
 
 			InfoRequest ireq = new InfoRequest(request.getFilename());
-			InfoResponse infoResponseObj = parent.retryableRequest(server, ireq, 1, InfoResponse.class);
+			InfoResponse infoResponseObj = parent.retryableRequestToFileserver(server, ireq, 1, InfoResponse.class);
 
 			if (user.getCredits() < infoResponseObj.getSize())
 				return new MessageResponse("Not enough Credits");
@@ -311,7 +305,7 @@ public class ProxySession implements Runnable, IProxy {
 			for (MyFileServerInfo server : readQuorum.values()) {
 
 				VersionRequest vreq = new VersionRequest(request.getFilename());
-				version = Math.max(((VersionResponse) (parent.retryableRequest(server, vreq, 1, VersionResponse.class))).getVersion(), version);
+				version = Math.max(((VersionResponse) (parent.retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion(), version);
 			}
 
 			if (version != -1) {

@@ -14,4 +14,10 @@ public class AliveMessage implements Serializable {
 	public int getPort() {
 		return port;
 	}
+	
+	@Override
+	public String toString()
+	{
+		return "!alive "+port;
+	}
 }

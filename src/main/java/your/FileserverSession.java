@@ -93,9 +93,6 @@ public class FileserverSession implements IFileServer, Runnable {
 			
 			channel.write(response);
 
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			System.err.println("lost connection");

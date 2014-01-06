@@ -10,15 +10,23 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.security.InvalidKeyException;
 import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import javax.crypto.Mac;
+
+import org.bouncycastle.crypto.macs.HMac;
+
 import message.AliveMessage;
 import message.response.MessageResponse;
+import networkio.Channel;
+import networkio.HMACChannel;
 import networkio.UDPChannel;
 import server.IFileServerCli;
 import util.ComponentFactory;
@@ -57,7 +65,20 @@ public class Fileserver implements IFileServerCli, Runnable {
 		initVersionMap();
 		InetAddress receiverAddress = InetAddress.getByName(proxyhost);
 		aliveSocket = new DatagramSocket();
-		final UDPChannel channel = new UDPChannel(aliveSocket,receiverAddress,proxyudpport);
+		
+		Mac hmac = null;
+		try {
+			hmac = Mac.getInstance("HmacSHA256");
+			hmac.init(shaKey);
+		} catch (InvalidKeyException e1) {
+			// does not happen
+			e1.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// does not happen
+			e.printStackTrace();
+		}
+		
+		final Channel channel = new HMACChannel(new UDPChannel(aliveSocket,receiverAddress,proxyudpport), hmac);
 		
 		//byte[] buf = (tcpport + "\0").getBytes();
 		final AliveMessage msg = new AliveMessage(tcpport);

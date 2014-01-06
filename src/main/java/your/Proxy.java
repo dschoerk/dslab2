@@ -238,12 +238,14 @@ public class Proxy implements IProxyCli, Runnable {
 	private class ProxyUdpHandler implements Runnable {
 
 		private DatagramSocket socket;
-		private UDPChannel channel;
+		private UDPChannel udpchannel;
+		private HMACChannel hmacchannel;
 
 		public ProxyUdpHandler(DatagramSocket socket) {
 			this.socket = socket;
 			try {
-				channel = new UDPChannel(socket);
+				udpchannel = new UDPChannel(socket);
+				hmacchannel = new HMACChannel(udpchannel, hmac);
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
@@ -261,34 +263,34 @@ public class Proxy implements IProxyCli, Runnable {
 					// socket.receive(p);
 					// int port = Integer.parseInt(new String(buf).trim());
 
-					AliveMessage msg = (AliveMessage) channel.read();
-					int port = msg.getPort();
-					DatagramPacket p = channel.getLatestPacket();
-					MyFileServerInfo f = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
+					try {
+						AliveMessage msg = (AliveMessage) hmacchannel.read();
+						int port = msg.getPort();
+						DatagramPacket p = udpchannel.getLatestPacket();
+						MyFileServerInfo f = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
 
-					synchronized (knownFileservers) {
+						synchronized (knownFileservers) {
 
-						MyFileServerInfo server = findServer(f);
+							MyFileServerInfo server = findServer(f);
 
-						if (server == null) { // new fileserver
-							server = f;
-							// populateFiles(server);
-							knownFileservers.add(server);
-						} else {
-							if (!server.isOnline()) {
-								// populateFiles(f);
+							if (server == null) { // new fileserver
+								server = f;
+								// populateFiles(server);
+								knownFileservers.add(server);
+							} else {
+								if (!server.isOnline()) {
+									// populateFiles(f);
+								}
 							}
-						}
 
-						server.setAlive();
-						// server.updateOnlineStatus(3000);
+							server.setAlive();
+							// server.updateOnlineStatus(3000);
+						}
+					} catch (ClassCastException e) {
+						// dropped package - no alive message
 					}
 				}
 			} catch (IOException e) {
-
-			} catch (ClassNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
 			}
 		}
 
@@ -335,9 +337,6 @@ public class Proxy implements IProxyCli, Runnable {
 			return (Response) req.read();
 
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ClassNotFoundException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		} finally {
@@ -395,25 +394,20 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 		return onlineservers;
 	}
-	
-	public <T extends Response> T retryableRequest(MyFileServerInfo server, Request req, int retryCounter, Class<? extends Response> responseClass) throws IOException,
-			RequestFailedException
-	{
+
+	public <T extends Response> T retryableRequestToFileserver(MyFileServerInfo server, Request req, int retryCounter,
+			Class<? extends Response> responseClass) throws IOException, RequestFailedException {
 		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
 		versionRequest.write(req);
 		try {
-			return (T)responseClass.cast(versionRequest.read());
+			return (T) responseClass.cast(versionRequest.read());
 
 		} catch (ClassCastException e) {
 			// we received a wrong object, try again
 			if (retryCounter > 0)
-				return retryableRequest(server, req, retryCounter - 1, responseClass);
+				return retryableRequestToFileserver(server, req, retryCounter - 1, responseClass);
 			else
 				throw new RequestFailedException();
-		} catch (ClassNotFoundException e) {
-			// does not happen
-			e.printStackTrace();
-			return null;
 		} finally {
 			versionRequest.close();
 		}

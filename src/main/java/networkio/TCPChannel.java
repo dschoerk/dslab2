@@ -18,7 +18,7 @@ public class TCPChannel extends Channel {
 	}
 
 	@Override
-	public byte[] readBytes() throws ClassNotFoundException, IOException {
+	public byte[] readBytes() throws IOException {
 		int size = is.readInt();
 		assert size > 0;
 		

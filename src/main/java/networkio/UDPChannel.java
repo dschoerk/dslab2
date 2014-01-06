@@ -34,7 +34,7 @@ public class UDPChannel extends Channel {
 	}
 	
 	@Override
-	public byte[] readBytes() throws ClassNotFoundException, IOException {
+	public byte[] readBytes() throws IOException {
 		
 		byte [] buf = new byte[256];
 		p = new DatagramPacket(buf, buf.length);

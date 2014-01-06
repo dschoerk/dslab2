@@ -150,10 +150,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public LoginResponse login(String username, String password) throws IOException {
 
-		//System.err.println("client login 1 ");
-		if(loggedin)
+		// System.err.println("client login 1 ");
+		if (loggedin)
 			return new LoginResponse(Type.SUCCESS);
-		
+
 		Key privk = getUserKey(username, password); // read private key for
 													// username
 		rsaChannelFromProxy = new RSAChannel(base_channel, privk, Cipher.DECRYPT_MODE);
@@ -169,9 +169,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 		try {
 			rsaChannelToProxy.write(message);
 			response = rsaChannelFromProxy.read();
-			if(!(response instanceof LoginMessageOk))
+			if (!(response instanceof LoginMessageOk))
 				return new LoginResponse(Type.WRONG_CREDENTIALS);
-			
+
 			LoginMessageOk msg_2nd = (LoginMessageOk) response;
 
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
@@ -184,15 +184,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 			response = aes_channel.read();
 			LoginResponse loginresponse = (LoginResponse) response;
-			
-			if(loginresponse.getType() == Type.SUCCESS)
+
+			if (loginresponse.getType() == Type.SUCCESS)
 				loggedin = true;
-			
+
 			return loginresponse;
 
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		} catch (SocketException e) {
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		} catch (IOException e) {
@@ -204,9 +201,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Override
 	public Response credits() throws IOException {
 
-		if(!loggedin)
+		if (!loggedin)
 			return new MessageResponse("Login first");
-		
+
 		CreditsRequest message = new CreditsRequest();
 
 		Response response;
@@ -221,8 +218,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 			CreditsResponse credits = (CreditsResponse) response;
 			return new MessageResponse("You have " + credits.getCredits() + " left!");
 
-		} catch (ClassNotFoundException e) {
-			throw new IOException("Failed Credits Request");
 		} catch (SocketException e) {
 			return new MessageResponse("Lost Connection");
 		}
@@ -231,10 +226,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public Response buy(long credits) throws IOException {
-		
-		if(!loggedin)
+
+		if (!loggedin)
 			return new MessageResponse("Login first");
-		
+
 		BuyRequest message = new BuyRequest(credits);
 
 		Object response;
@@ -244,8 +239,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 			BuyResponse buyresponse = (BuyResponse) response;
 			return new MessageResponse("You now have " + buyresponse.getCredits() + "!");
 
-		} catch (ClassNotFoundException e) {
-			throw new IOException("Failed Buy Request");
 		} catch (SocketException e) {
 			return new MessageResponse("Lost Connection");
 		}
@@ -254,10 +247,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public Response list() throws IOException {
-		
-		if(!loggedin)
+
+		if (!loggedin)
 			return new MessageResponse("Login first");
-		
+
 		ListRequest req = new ListRequest();
 
 		Response response;
@@ -266,22 +259,19 @@ public class Client implements IClientCli, RMICallbackInterface {
 			response = (Response) aes_channel.read();
 			return response;
 
-		} catch (ClassNotFoundException e) {
-			// may not happen
-			e.printStackTrace();
 		} catch (SocketException e) {
-			return new MessageResponse("Lost Connection");
+			return new MessageResponse("Error while reading Files");
 		}
-		return new MessageResponse("Error while reading Files");
+
 	}
 
 	@Command
 	@Override
 	public Response download(String filename) throws IOException {
 
-		if(!loggedin)
+		if (!loggedin)
 			return new MessageResponse("Login first");
-		
+
 		DownloadTicketRequest message = new DownloadTicketRequest(filename);
 		Object response = null;
 		try {
@@ -295,13 +285,12 @@ public class Client implements IClientCli, RMICallbackInterface {
 			DownloadTicketResponse ticketResponse = (DownloadTicketResponse) response;
 			DownloadTicket ticket = ticketResponse.getTicket();
 
-			
 			Socket s = new Socket(ticket.getAddress(), ticket.getPort());
 			Channel req = new TCPChannel(s);
-			
+
 			DownloadFileRequest dfr = new DownloadFileRequest(ticket);
 			req.write(dfr);
-			Response downloadResponse = (Response)req.read();
+			Response downloadResponse = (Response) req.read();
 			s.close();
 
 			if (downloadResponse instanceof MessageResponse) {
@@ -313,19 +302,16 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		} catch (SocketException e) {
 			return new MessageResponse("Lost Connection");
-		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
-			return new MessageResponse("Lost Connection");
-		}
+		} 
 	}
 
 	@Command
 	@Override
 	public MessageResponse upload(String filename) throws IOException {
-		
-		if(!loggedin)
+
+		if (!loggedin)
 			return new MessageResponse("Login first");
-		
+
 		File f = new File(downloadDirectory.getAbsolutePath() + "/" + filename);
 		if (!f.exists())
 			return new MessageResponse("file does not exist");
@@ -343,8 +329,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 			MessageResponse uploadresponse = (MessageResponse) response;
 			return uploadresponse;
 
-		} catch (ClassNotFoundException e) {
-			throw new IOException("Failed Buy Request");
 		} catch (SocketException e) {
 			return new MessageResponse("Lost Connection");
 		}
@@ -353,22 +337,19 @@ public class Client implements IClientCli, RMICallbackInterface {
 	@Command
 	@Override
 	public MessageResponse logout() throws IOException {
-		
-		if(!loggedin)
+
+		if (!loggedin)
 			return new MessageResponse("Login first");
-		
+
 		LogoutRequest message = new LogoutRequest();
 		aes_channel.write(message);
-		
+
 		loggedin = false;
 
 		// muss gelesen werden!
-		try {
-			MessageResponse uploadresponse = (MessageResponse) aes_channel.read();
-		} catch (ClassNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+
+		MessageResponse uploadresponse = (MessageResponse) aes_channel.read();
+
 		return new MessageResponse("Successfully logged out.");
 	}
 

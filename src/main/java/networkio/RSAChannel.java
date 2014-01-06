@@ -52,7 +52,7 @@ public class RSAChannel extends Channel {
 	}
 
 	@Override
-	public byte[] readBytes() throws ClassNotFoundException, IOException {
+	public byte[] readBytes() throws IOException {
 		
 		byte[] data = parent.readBytes();
 		try {
