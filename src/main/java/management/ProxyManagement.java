@@ -20,11 +20,15 @@ public class ProxyManagement extends UnicastRemoteObject implements
     Registry registry;
 
     ArrayList<Subscription> subscribers;
+    Map<String, FileInfo> files;
     Proxy parent;
 
     public ProxyManagement(Proxy parent) throws RemoteException {
-
+        
         this.parent = parent;
+        
+        files = new HashMap<String,FileInfo>();
+        
         Config cfg = new Config("mc");
         subscribers = new ArrayList<Subscription>();
 
@@ -54,11 +58,11 @@ public class ProxyManagement extends UnicastRemoteObject implements
     @Override
     public List<String> getTopThree() throws RemoteException {
 
-        Map<String, FileInfo> files = sortByValues(parent.getFiles());
-        files.putAll(parent.getFiles());
+        Map<String, FileInfo> f = sortByValues(files);
+        f.putAll(parent.getFiles());
         ArrayList<String> ret = new ArrayList<String>(3);
         int i = 0;
-        for (Entry<String, FileInfo> e : files.entrySet()) {
+        for (Entry<String, FileInfo> e : f.entrySet()) {
             FileInfo fi = e.getValue();
             ret.add(i,
                     (i + 1) + ". " + fi.getName() + "\t\t"
@@ -114,12 +118,28 @@ public class ProxyManagement extends UnicastRemoteObject implements
         // TODO Auto-generated method stub
 
     }
+    
+    public void incDownloads(String filename){
+        
+        FileInfo f = files.get(filename);
+        
+        if(f==null){
+            f=new FileInfo(filename,0);
+            f.incDownloadCnt();
+            files.put(filename, f);
+        }else{
+            f.incDownloadCnt();
+        }
+        updateSubscriptions(filename);
+    }
 
-    public void updateSubscriptions(FileInfo file) {
+    public void updateSubscriptions(String filename) {
         ArrayList<Subscription> toRemove = new ArrayList<Subscription>();
         synchronized (subscribers) {
             for (Subscription s : subscribers) {
-                if (s.getFile().equals(file.getName()) && s.getTrigger() <= file.getDownloadCnt()) {
+                FileInfo f = files.get(filename);
+                if(f==null)continue;
+                if (s.getFile().equals(filename) && s.getTrigger() <= f.getDownloadCnt()) {
                     try {
                         s.getCallback().notifySubscriber(s.getFile(), s.getTrigger());
                         toRemove.add(s);

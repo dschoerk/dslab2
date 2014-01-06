@@ -268,13 +268,8 @@ public class ProxySession implements Runnable, IProxy {
 					server.getAddress(), server.getTcpport());
 			user.addCredits(-infoResponseObj.getSize());
 
-			/*
-			 * FileInfo file =
-			 * parent.getFiles().get(infoResponseObj.getFilename());
-			 * if(file!=null){ file.incDownloadCnt();
-			 * parent.getManagementComonent().updateSubscriptions(file); }
-			 */
-
+			
+			parent.getManagementComonent().incDownloads(request.getFilename());
 			server.incUsage(infoResponseObj.getSize());
 
 			DownloadTicketResponse response = new DownloadTicketResponse(ticket);
