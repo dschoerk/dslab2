@@ -7,7 +7,6 @@
 client: !login alice 12345
 client: !login alice 12345
 proxy: !fileservers
-*	startFileServer fs2
 proxy: !fileservers
 
 client: !download short.txt

@@ -302,7 +302,7 @@ public class ProxySession implements Runnable, IProxy {
 		try {
 
 			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
-			NumberNW = (int) Math.ceil(parent.getOnlineServer().size() / 2.0) + 1;
+			NumberNW = (int) Math.floor(parent.getOnlineServer().size() / 2.0) + 1;
 			Set<MyFileServerInfo> readQuorum = getQuorum(NumberNR);
 			Set<MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
 			if (readQuorum.isEmpty()) {
@@ -352,6 +352,9 @@ public class ProxySession implements Runnable, IProxy {
 		Set<MyFileServerInfo> known = parent.getOnlineServer();
 
 		Iterator<MyFileServerInfo> it = known.iterator();
+		
+		System.out.println(quorumSize + " " + known.size());
+		
 		for (int i = 0; i < quorumSize; i++)
 			writeQuorum.add(it.next());
 		

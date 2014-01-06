@@ -264,7 +264,6 @@ public class Proxy implements IProxyCli, Runnable {
 						if (server == null) {
 						    server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
 							knownFileservers.add(server);
-							System.out.println("add");
 						}
 
 						server.setAlive();
