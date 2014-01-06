@@ -39,4 +39,9 @@ public class HMACWrapped implements Serializable {
 
 		return Serializer.decode(object);
 	}
+	
+	public byte [] getObjectBytes() throws IOException {
+
+		return object;
+	}
 }

@@ -8,6 +8,8 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutput;
 import java.io.ObjectOutputStream;
 
+import message.response.MessageIntegrityErrorResponse;
+
 // http://stackoverflow.com/questions/2836646/java-serializable-object-to-byte-array
 public class Serializer {
 
@@ -47,9 +49,7 @@ public class Serializer {
 			Object o = in.readObject();
 			return o;
 		} catch (ClassNotFoundException e) {
-			// does not happen
-			e.printStackTrace();
-			return null;
+			return new String(data);
 		} finally {
 			try {
 				bis.close();

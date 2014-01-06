@@ -78,7 +78,9 @@ public class Fileserver implements IFileServerCli, Runnable {
 			e.printStackTrace();
 		}
 		
-		final Channel channel = new HMACChannel(new UDPChannel(aliveSocket,receiverAddress,proxyudpport), hmac);
+		final Channel udpChannel = new UDPChannel(aliveSocket,receiverAddress,proxyudpport);
+		final Channel channel = new HMACChannel(udpChannel, hmac);
+		
 		
 		//byte[] buf = (tcpport + "\0").getBytes();
 		final AliveMessage msg = new AliveMessage(tcpport);

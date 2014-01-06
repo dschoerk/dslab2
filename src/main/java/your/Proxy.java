@@ -287,6 +287,7 @@ public class Proxy implements IProxyCli, Runnable {
 							// server.updateOnlineStatus(3000);
 						}
 					} catch (ClassCastException e) {
+						System.err.println("class cast err");
 						// dropped package - no alive message
 					}
 				}

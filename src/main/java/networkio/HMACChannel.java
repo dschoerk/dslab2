@@ -28,8 +28,9 @@ public class HMACChannel extends Channel {
 		byte[] hash = hMac.doFinal(Serializer.decode(data).toString().getBytes());
 
 		// simulate error
+
 		if (0 == new Random().nextInt(9)) {
-			data[0] = 0;
+			data[10] = 0;
 		}
 
 		HMACWrapped w = new HMACWrapped(data, hash);
@@ -42,19 +43,24 @@ public class HMACChannel extends Channel {
 		byte[] data = parent.readBytes();
 
 		Object response;
+		HMACWrapped w = null;
 		try {
-			HMACWrapped w = (HMACWrapped) Serializer.decode(data);
+			w = (HMACWrapped) Serializer.decode(data);
 			correctChecksum = w.isChecksumCorrect(hMac);
 			response = w.getObject();
 
-			if (!correctChecksum)
+			if (!correctChecksum) {
+				System.out.println("unverified message (wrong checksum): " + response.toString());
 				response = new MessageIntegrityErrorResponse();
+			}
+
 		} catch (StreamCorruptedException e) {
+			System.out.println("unverified message (damaged object): " + new String(w.getObjectBytes()));
+			e.printStackTrace();
 			response = new MessageIntegrityErrorResponse();
 		}
 
 		return Serializer.encode(response);
-
 	}
 
 	public boolean isChecksumCorrect() {

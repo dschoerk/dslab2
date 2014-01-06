@@ -79,7 +79,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 	MessageInterface managementComponent;
 
 	public static void main(String[] args) throws Exception {
-
 		ComponentFactory factory = new ComponentFactory();
 		Shell shell = new Shell("Client", System.out, System.in);
 		Config cfg = new Config("client");

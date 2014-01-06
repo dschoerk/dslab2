@@ -8,4 +8,10 @@ import message.Response;
 public class MessageIntegrityErrorResponse implements Response {
 
 	private static final long serialVersionUID = -6559716684681260153L;
+	
+	@Override
+	public String toString()
+	{
+		return "MessageIntegrityErrorResponse";
+	}
 }

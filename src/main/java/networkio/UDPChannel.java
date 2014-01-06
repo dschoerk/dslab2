@@ -45,7 +45,7 @@ public class UDPChannel extends Channel {
 		dis.close();
 		
 		byte [] data = new byte[paketLength]; 
-		System.arraycopy(buf, 4, data, 0, paketLength);
+		dis.read(data);
 		
 		return data;
 	}
