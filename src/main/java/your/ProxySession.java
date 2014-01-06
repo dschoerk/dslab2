@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -41,7 +42,6 @@ import message.response.InfoResponse;
 import message.response.ListResponse;
 import message.response.LoginResponse;
 import message.response.LoginResponse.Type;
-import message.response.MessageIntegrityErrorResponse;
 import message.response.MessageResponse;
 import message.response.VersionResponse;
 import model.DownloadTicket;
@@ -70,7 +70,7 @@ public class ProxySession implements Runnable, IProxy {
 	private UserDB users;
 
 	private User user = null;
-//	private boolean running = true;
+	// private boolean running = true;
 
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
 	private static Set<Class<?>> hasArgument = new HashSet<Class<?>>();
@@ -82,7 +82,7 @@ public class ProxySession implements Runnable, IProxy {
 		this.socket = s;
 		this.parent = parent;
 		this.users = parent.getUserDB();
-		
+
 		try {
 			hmac = Mac.getInstance("HmacSHA256");
 			hmac.init(parent.getShaKey());
@@ -218,7 +218,7 @@ public class ProxySession implements Runnable, IProxy {
 			}
 			Set<String> fileNames = new HashSet<String>();
 
-			for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
+			for (MyFileServerInfo ser : parent.getOnlineServer()) {
 				// Ask the Fileserver what files he has
 				ListRequest lreq = new ListRequest();
 				ListResponse listResponseObj = retryableRequestToFileserver(ser, lreq, 1, ListResponse.class);
@@ -236,57 +236,56 @@ public class ProxySession implements Runnable, IProxy {
 
 		try {
 			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
+
 			if (user == null)
 				return new MessageResponse("You have to login first");
 
-			ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+			Set<MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+
 			if (readQuorum.isEmpty()) {
 				return new MessageResponse("No Fileserver available");
 			}
 
 			boolean filefound = false;
-			Enumeration<MyFileServerInfo> fileserver = readQuorum.elements();
-			MyFileServerInfo server = fileserver.nextElement();
-			int version = -2;
-
-			VersionRequest vreq = new VersionRequest(request.getFilename());
-			version = ((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion();
-
-			while (fileserver.hasMoreElements()) {
-				MyFileServerInfo ser = fileserver.nextElement();
-				int aktversion = ((VersionResponse) (retryableRequestToFileserver(ser, vreq, 1, VersionResponse.class))).getVersion();
-				if (aktversion != -1) {
-					filefound = true;
-					if (aktversion > version) {
-						version = aktversion;
-						server = ser;
-					} else if (aktversion == version) {
-						if (ser.getUsage() < server.getUsage())
-							server = ser;
-					}
-				} else {
-					filefound = false;
+			
+			int newestVersion = -2;
+			MyFileServerInfo newestVersionServer = null;
+			for(MyFileServerInfo server : readQuorum)
+			{
+				VersionRequest vreq = new VersionRequest(request.getFilename());
+				
+				// -1 not exist
+				int version = ((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class)))
+						.getVersion();
+				
+				if(version > newestVersion) //TODO: aufsteigend oder absteigend sortiert wegen usage?
+				{
+					newestVersion = version;
+					newestVersionServer = server;
 				}
 			}
-			if (filefound == false && version == -1)
+			
+			if (newestVersion == -1)
 				return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
 
 			InfoRequest ireq = new InfoRequest(request.getFilename());
-			InfoResponse infoResponseObj = retryableRequestToFileserver(server, ireq, 1, InfoResponse.class);
+			InfoResponse infoResponseObj = retryableRequestToFileserver(newestVersionServer, ireq, 1, InfoResponse.class);
 
 			if (user.getCredits() < infoResponseObj.getSize())
 				return new MessageResponse("Not enough Credits");
 
-			String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), version,
+			String checksum = ChecksumUtils.generateChecksum(user.getName(), request.getFilename(), newestVersion,
 					infoResponseObj.getSize());
 
 			DownloadTicket ticket = new DownloadTicket(user.getName(), request.getFilename(), checksum,
-					server.getAddress(), server.getTcpport());
+					newestVersionServer.getAddress(), newestVersionServer.getTcpport());
 			user.addCredits(-infoResponseObj.getSize());
 
-			
 			parent.getManagementComonent().incDownloads(request.getFilename());
-			server.incUsage(infoResponseObj.getSize());
+
+			newestVersionServer.incUsage(infoResponseObj.getSize());
+
+			parent.updateFileserverInKnownfileservers(newestVersionServer);
 
 			DownloadTicketResponse response = new DownloadTicketResponse(ticket);
 			return response;
@@ -304,18 +303,19 @@ public class ProxySession implements Runnable, IProxy {
 
 			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
 			NumberNW = (int) Math.ceil(parent.getOnlineServer().size() / 2.0) + 1;
-			ConcurrentHashMap<Long, MyFileServerInfo> readQuorum = getQuorum(NumberNR);
-			ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
+			Set<MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+			Set<MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
 			if (readQuorum.isEmpty()) {
 				return new MessageResponse("No Fileserver available");
 			}
 			int version = -1;
 
-
-			for (MyFileServerInfo server : readQuorum.values()) {
+			for (MyFileServerInfo server : readQuorum) {
 
 				VersionRequest vreq = new VersionRequest(request.getFilename());
-				version = Math.max(((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion(), version);
+				version = Math.max(
+						((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class)))
+								.getVersion(), version);
 			}
 
 			if (version != -1) {
@@ -346,17 +346,15 @@ public class ProxySession implements Runnable, IProxy {
 		return user;
 	}
 
-	private ConcurrentHashMap<Long, MyFileServerInfo> getQuorum(int quorumSize) {
-		ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum = new ConcurrentHashMap<Long, MyFileServerInfo>();
+	private Set<MyFileServerInfo> getQuorum(int quorumSize) {
 
-		int i = 0;
-		for (MyFileServerInfo server : parent.getOnlineServer().keySet()) {
-			if (i < quorumSize)
-				writeQuorum.put(server.getUsage(), server);
-			else
-				break;
-			i++;
-		}
+		Set<MyFileServerInfo> writeQuorum = new HashSet<MyFileServerInfo>();
+		Set<MyFileServerInfo> known = parent.getOnlineServer();
+
+		Iterator<MyFileServerInfo> it = known.iterator();
+		for (int i = 0; i < quorumSize; i++)
+			writeQuorum.add(it.next());
+		
 		return writeQuorum;
 	}
 
@@ -387,12 +385,15 @@ public class ProxySession implements Runnable, IProxy {
 			e.printStackTrace();
 		}
 	}
-	
+
 	public <T extends Response> T retryableRequestToFileserver(MyFileServerInfo server, Request req, int retryCounter,
-			Class<? extends Response> responseClass) throws IOException, RequestFailedException {
-		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
-		versionRequest.write(req);
+			Class<? extends Response> responseClass) throws RequestFailedException {
+
+		Channel versionRequest = null;
 		try {
+			versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
+			versionRequest.write(req);
+
 			return (T) responseClass.cast(versionRequest.read());
 
 		} catch (ClassCastException e) {
@@ -401,25 +402,33 @@ public class ProxySession implements Runnable, IProxy {
 				return retryableRequestToFileserver(server, req, retryCounter - 1, responseClass);
 			else
 				throw new RequestFailedException();
+		} catch (IOException e) {
+			if (retryCounter > 0)
+				return retryableRequestToFileserver(server, req, retryCounter - 1, responseClass);
+			else
+				throw new RequestFailedException();
 		} finally {
-			versionRequest.close();
+			if (versionRequest != null)
+				versionRequest.close();
 		}
 	}
-	
-	public void distributeFile(ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum, FileInfo info, int version) throws IOException, RequestFailedException {
 
-		for (MyFileServerInfo server : writeQuorum.values()) {
+	public void distributeFile(Set<MyFileServerInfo> writeQuorum, FileInfo info, int version)
+			throws IOException, RequestFailedException {
+
+		for (MyFileServerInfo server : writeQuorum) {
 
 			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
 			MessageResponse resp = retryableRequestToFileserver(server, requestObj, 1, MessageResponse.class);
-			
-//			Response res = uploadRequest(info, version, server);
-//			if (res == null || res instanceof MessageIntegrityErrorResponse) {
-//				// Try again if failed
-//				res = uploadRequest(info, version, server);
-//
-//				// TODO: what todo if upload fails 2 times ?
-//			}
+
+			// Response res = uploadRequest(info, version, server);
+			// if (res == null || res instanceof MessageIntegrityErrorResponse)
+			// {
+			// // Try again if failed
+			// res = uploadRequest(info, version, server);
+			//
+			// // TODO: what todo if upload fails 2 times ?
+			// }
 		}
 	}
 }

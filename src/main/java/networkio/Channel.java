@@ -15,5 +15,5 @@ public abstract class Channel {
 
 	public abstract byte[] readBytes() throws IOException;
 
-	public abstract void close() throws IOException;
+	public abstract void close();
 }

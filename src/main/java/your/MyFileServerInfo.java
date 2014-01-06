@@ -7,7 +7,7 @@ import java.util.List;
 
 import model.FileServerInfo;
 
-public class MyFileServerInfo {
+public class MyFileServerInfo implements Comparable<MyFileServerInfo> {
 
 	private long lastAliveMessage;
 	private int tcpport;
@@ -83,5 +83,10 @@ public class MyFileServerInfo {
 
 	public InetAddress getAddress() {
 		return address;
+	}
+
+	@Override
+	public int compareTo(MyFileServerInfo o) {
+		return (int)(usage-o.usage);
 	}
 }

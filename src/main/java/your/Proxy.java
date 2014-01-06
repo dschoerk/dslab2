@@ -17,12 +17,15 @@ import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -30,25 +33,13 @@ import javax.crypto.Mac;
 
 import management.ProxyManagement;
 import message.AliveMessage;
-import message.Request;
 import message.Response;
-import message.request.InfoRequest;
-import message.request.ListRequest;
-import message.request.UploadRequest;
-import message.request.VersionRequest;
 import message.response.FileServerInfoResponse;
-import message.response.InfoResponse;
-import message.response.ListResponse;
-import message.response.MessageIntegrityErrorResponse;
 import message.response.MessageResponse;
 import message.response.UserInfoResponse;
-import message.response.VersionResponse;
 import model.FileServerInfo;
 import model.UserInfo;
-import networkio.Channel;
 import networkio.HMACChannel;
-import networkio.RequestFailedException;
-import networkio.TCPChannel;
 import networkio.UDPChannel;
 
 import org.bouncycastle.openssl.PEMReader;
@@ -66,7 +57,7 @@ public class Proxy implements IProxyCli, Runnable {
 	private ServerSocket tcpServer;
 	private DatagramSocket udpServer;
 
-	private List<MyFileServerInfo> knownFileservers;
+	private SortedSet<MyFileServerInfo> knownFileservers;
 	private List<ProxySession> sessions;
 	private Map<String, FileInfo> knownFiles;
 
@@ -112,7 +103,7 @@ public class Proxy implements IProxyCli, Runnable {
 			e.printStackTrace();
 		}
 
-		knownFileservers = Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
+		knownFileservers = Collections.synchronizedSortedSet(new TreeSet<MyFileServerInfo>());
 		sessions = Collections.synchronizedList(new ArrayList<ProxySession>());
 		knownFiles = Collections.synchronizedMap(new HashMap<String, FileInfo>());
 
@@ -266,26 +257,22 @@ public class Proxy implements IProxyCli, Runnable {
 					try {
 						AliveMessage msg = (AliveMessage) hmacchannel.read();
 						int port = msg.getPort();
+						
+						System.out.println(port);
+						
 						DatagramPacket p = udpchannel.getLatestPacket();
-						MyFileServerInfo f = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
-
-						synchronized (knownFileservers) {
-
-							MyFileServerInfo server = findServer(f);
-
-							if (server == null) { // new fileserver
-								server = f;
-								// populateFiles(server);
-								knownFileservers.add(server);
-							} else {
-								if (!server.isOnline()) {
-									// populateFiles(f);
-								}
-							}
-
-							server.setAlive();
-							// server.updateOnlineStatus(3000);
+						MyFileServerInfo server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
+						
+						if (!knownFileservers.contains(server)) {
+							knownFileservers.add(server);
+							System.out.println("add");
 						}
+
+						server.setAlive();
+						// server.updateOnlineStatus(3000);
+
+						System.out.println("knownfileserver:" + knownFileservers.size());
+
 					} catch (ClassCastException e) {
 						System.err.println("class cast err");
 						// dropped package - no alive message
@@ -304,41 +291,6 @@ public class Proxy implements IProxyCli, Runnable {
 			return null;
 		}
 	}
-
-//	private Channel createFsChannel(Socket s) throws IOException {
-//		return new TCPChannel(s);
-//	}
-
-	public MyFileServerInfo getLeastUsedFileServer() {
-
-		return MyFileServerInfo.minimumUsage(knownFileservers);
-	}
-
-	
-
-//	private Response uploadRequest(FileInfo info, int version, MyFileServerInfo server) {
-//
-//		Channel req = null;
-//		try {
-//			req = new HMACChannel(createFsChannel(server.createSocket()), hmac);
-//			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
-//			req.write(requestObj);
-//			return (Response) req.read();
-//
-//		} catch (IOException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		} finally {
-//			try {
-//				req.close();
-//			} catch (IOException e) {
-//				// TODO Auto-generated catch block
-//				e.printStackTrace();
-//			}
-//		}
-//
-//		return null;
-//	}
 
 	public Map<String, FileInfo> getFiles() {
 		return knownFiles;
@@ -370,21 +322,25 @@ public class Proxy implements IProxyCli, Runnable {
 		return managementComponent;
 	}
 
-	public HashMap<MyFileServerInfo, Long> getOnlineServer() {
-		HashMap<MyFileServerInfo, Long> onlineservers = new HashMap<MyFileServerInfo, Long>();
-		List<MyFileServerInfo> copyknownFileservers = Collections.synchronizedList(new ArrayList<MyFileServerInfo>());
-		copyknownFileservers.addAll(knownFileservers);
+	public Set<MyFileServerInfo> getOnlineServer() {
 
-		while (!copyknownFileservers.isEmpty()) {
+		Set<MyFileServerInfo> set = new HashSet<MyFileServerInfo>();
 
-			MyFileServerInfo minimumUsedServer = MyFileServerInfo.minimumUsage(copyknownFileservers);
-			onlineservers.put(minimumUsedServer, minimumUsedServer.getUsage());
-			copyknownFileservers.remove(minimumUsedServer);
+		for (MyFileServerInfo inf : knownFileservers) {
+			if (inf.isOnline())
+				set.add(inf);
 		}
-		return onlineservers;
+
+		return set;
 	}
 
 	public Key getShaKey() {
 		return shaKey;
+	}
+
+	public synchronized void updateFileserverInKnownfileservers(MyFileServerInfo server) {
+		if (knownFileservers.remove(server)) {
+			knownFileservers.add(server);
+		}
 	}
 }

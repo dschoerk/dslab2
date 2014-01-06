@@ -1,4 +1,5 @@
 *	startFileServer fs1
+*	startFileServer fs2
 *	startProxy proxy
 *	startClient client
 
@@ -11,7 +12,7 @@ proxy: !fileservers
 
 client: !download short.txt
 fs1:  !exit
-fs2: !exit
+fs2:  !exit
 proxy:	!exit
 client: !exit
 

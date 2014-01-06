@@ -66,7 +66,7 @@ public class UDPChannel extends Channel {
 	}
 
 	@Override
-	public void close() throws IOException {
+	public void close() {
 		socket.close();
 	}
 }

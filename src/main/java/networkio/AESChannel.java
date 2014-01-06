@@ -80,7 +80,7 @@ public class AESChannel extends Channel {
 	}
 
 	@Override
-	public void close() throws IOException {
+	public void close() {
 		parent.close();
 	}
 }

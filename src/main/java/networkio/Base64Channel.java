@@ -27,7 +27,7 @@ public class Base64Channel extends Channel {
 	}
 
 	@Override
-	public void close() throws IOException {
+	public void close() {
 		parent.close();
 	}
 }

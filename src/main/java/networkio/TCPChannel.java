@@ -21,8 +21,8 @@ public class TCPChannel extends Channel {
 	public byte[] readBytes() throws IOException {
 		int size = is.readInt();
 		assert size > 0;
-		
-		byte [] buffer = new byte[size];
+
+		byte[] buffer = new byte[size];
 		is.read(buffer);
 		return buffer;
 	}
@@ -34,9 +34,14 @@ public class TCPChannel extends Channel {
 	}
 
 	@Override
-	public void close() throws IOException {
-		is.close();
-		os.close();
-		socket.close();
+	public void close() {
+		try {
+			is.close();
+			os.close();
+			socket.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 	}
 }
