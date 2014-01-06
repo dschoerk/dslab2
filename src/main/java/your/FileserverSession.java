@@ -162,7 +162,7 @@ public class FileserverSession implements IFileServer, Runnable {
 	@Override
 	public MessageResponse upload(UploadRequest request) throws IOException {
 
-		System.out.println("UPLOADED");
+//		System.out.println("UPLOADED");
 		
 		try {
 			FileOutputStream fos = new FileOutputStream(parent.getDownloadDirectory().getAbsolutePath() + "/"
@@ -179,7 +179,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	public Response hmacwrapped(HMACWrapped obj) throws IOException {
 		
-		System.out.println("checksum correct: " + obj.isChecksumCorrect(hmac));
+//		System.out.println("checksum correct: " + obj.isChecksumCorrect(hmac));
 
 		channel = mactcpchannel;
 		

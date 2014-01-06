@@ -30,7 +30,7 @@ public class HMACChannel extends Channel {
 		// simulate error
 
 		if (0 == new Random().nextInt(9)) {
-			data[10] = 0;
+			//data[10] = 0;
 		}
 
 		HMACWrapped w = new HMACWrapped(data, hash);

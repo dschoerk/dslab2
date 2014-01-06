@@ -305,52 +305,40 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 	}
 
-	private Channel createFsChannel(Socket s) throws IOException {
-		return new TCPChannel(s);
-	}
+//	private Channel createFsChannel(Socket s) throws IOException {
+//		return new TCPChannel(s);
+//	}
 
 	public MyFileServerInfo getLeastUsedFileServer() {
 
 		return MyFileServerInfo.minimumUsage(knownFileservers);
 	}
 
-	public void distributeFile(ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum, FileInfo info, int version) {
+	
 
-		for (MyFileServerInfo server : writeQuorum.values()) {
-
-			Response res = uploadRequest(info, version, server);
-			if (res == null || res instanceof MessageIntegrityErrorResponse) {
-				// Try again if failed
-				res = uploadRequest(info, version, server);
-
-				// TODO: what todo if upload fails 2 times ?
-			}
-		}
-	}
-
-	private Response uploadRequest(FileInfo info, int version, MyFileServerInfo server) {
-
-		Channel req = null;
-		try {
-			req = new HMACChannel(createFsChannel(server.createSocket()), hmac);
-			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
-			req.write(requestObj);
-			return (Response) req.read();
-
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} finally {
-			try {
-				req.close();
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-
-		return null;
-	}
+//	private Response uploadRequest(FileInfo info, int version, MyFileServerInfo server) {
+//
+//		Channel req = null;
+//		try {
+//			req = new HMACChannel(createFsChannel(server.createSocket()), hmac);
+//			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
+//			req.write(requestObj);
+//			return (Response) req.read();
+//
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		} finally {
+//			try {
+//				req.close();
+//			} catch (IOException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//		}
+//
+//		return null;
+//	}
 
 	public Map<String, FileInfo> getFiles() {
 		return knownFiles;
@@ -396,21 +384,7 @@ public class Proxy implements IProxyCli, Runnable {
 		return onlineservers;
 	}
 
-	public <T extends Response> T retryableRequestToFileserver(MyFileServerInfo server, Request req, int retryCounter,
-			Class<? extends Response> responseClass) throws IOException, RequestFailedException {
-		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
-		versionRequest.write(req);
-		try {
-			return (T) responseClass.cast(versionRequest.read());
-
-		} catch (ClassCastException e) {
-			// we received a wrong object, try again
-			if (retryCounter > 0)
-				return retryableRequestToFileserver(server, req, retryCounter - 1, responseClass);
-			else
-				throw new RequestFailedException();
-		} finally {
-			versionRequest.close();
-		}
+	public Key getShaKey() {
+		return shaKey;
 	}
 }

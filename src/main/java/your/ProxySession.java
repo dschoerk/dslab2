@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.net.Socket;
+import java.security.InvalidKeyException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
@@ -17,10 +18,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
 import javax.crypto.SecretKey;
 
 import message.LoginMessageFinal;
 import message.LoginMessageOk;
+import message.Request;
 import message.Response;
 import message.request.BuyRequest;
 import message.request.CreditsRequest;
@@ -45,6 +48,7 @@ import model.DownloadTicket;
 import networkio.AESChannel;
 import networkio.Base64Channel;
 import networkio.Channel;
+import networkio.HMACChannel;
 import networkio.RSAChannel;
 import networkio.RequestFailedException;
 import networkio.TCPChannel;
@@ -66,17 +70,29 @@ public class ProxySession implements Runnable, IProxy {
 	private UserDB users;
 
 	private User user = null;
-	private boolean running = true;
+//	private boolean running = true;
 
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
 	private static Set<Class<?>> hasArgument = new HashSet<Class<?>>();
 
 	private Proxy parent;
+	private Mac hmac;
 
 	public ProxySession(Socket s, Proxy parent) {
 		this.socket = s;
 		this.parent = parent;
 		this.users = parent.getUserDB();
+		
+		try {
+			hmac = Mac.getInstance("HmacSHA256");
+			hmac.init(parent.getShaKey());
+		} catch (InvalidKeyException e1) {
+			// does not happen
+			e1.printStackTrace();
+		} catch (NoSuchAlgorithmException e) {
+			// does not happen
+			e.printStackTrace();
+		}
 
 		try {
 			base_channel = new Base64Channel(new TCPChannel(socket));
@@ -205,7 +221,7 @@ public class ProxySession implements Runnable, IProxy {
 			for (MyFileServerInfo ser : parent.getOnlineServer().keySet()) {
 				// Ask the Fileserver what files he has
 				ListRequest lreq = new ListRequest();
-				ListResponse listResponseObj = parent.retryableRequestToFileserver(ser, lreq, 1, ListResponse.class);
+				ListResponse listResponseObj = retryableRequestToFileserver(ser, lreq, 1, ListResponse.class);
 				fileNames.addAll(listResponseObj.getFileNames());
 			}
 			return new ListResponse(fileNames);
@@ -234,11 +250,11 @@ public class ProxySession implements Runnable, IProxy {
 			int version = -2;
 
 			VersionRequest vreq = new VersionRequest(request.getFilename());
-			version = ((VersionResponse) (parent.retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion();
+			version = ((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion();
 
 			while (fileserver.hasMoreElements()) {
 				MyFileServerInfo ser = fileserver.nextElement();
-				int aktversion = ((VersionResponse) (parent.retryableRequestToFileserver(ser, vreq, 1, VersionResponse.class))).getVersion();
+				int aktversion = ((VersionResponse) (retryableRequestToFileserver(ser, vreq, 1, VersionResponse.class))).getVersion();
 				if (aktversion != -1) {
 					filefound = true;
 					if (aktversion > version) {
@@ -256,7 +272,7 @@ public class ProxySession implements Runnable, IProxy {
 				return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
 
 			InfoRequest ireq = new InfoRequest(request.getFilename());
-			InfoResponse infoResponseObj = parent.retryableRequestToFileserver(server, ireq, 1, InfoResponse.class);
+			InfoResponse infoResponseObj = retryableRequestToFileserver(server, ireq, 1, InfoResponse.class);
 
 			if (user.getCredits() < infoResponseObj.getSize())
 				return new MessageResponse("Not enough Credits");
@@ -299,7 +315,7 @@ public class ProxySession implements Runnable, IProxy {
 			for (MyFileServerInfo server : readQuorum.values()) {
 
 				VersionRequest vreq = new VersionRequest(request.getFilename());
-				version = Math.max(((VersionResponse) (parent.retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion(), version);
+				version = Math.max(((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class))).getVersion(), version);
 			}
 
 			if (version != -1) {
@@ -309,7 +325,7 @@ public class ProxySession implements Runnable, IProxy {
 			}
 
 			FileInfo info = new FileInfo(request.getFilename(), request.getContent().length, request.getContent());
-			parent.distributeFile(writeQuorum, info, version);
+			distributeFile(writeQuorum, info, version);
 			user.addCredits(2 * request.getContent().length);
 			return new MessageResponse("File: " + info.getName() + " has been uploaded");
 
@@ -369,6 +385,41 @@ public class ProxySession implements Runnable, IProxy {
 			e.printStackTrace();
 		} catch (SecurityException e) {
 			e.printStackTrace();
+		}
+	}
+	
+	public <T extends Response> T retryableRequestToFileserver(MyFileServerInfo server, Request req, int retryCounter,
+			Class<? extends Response> responseClass) throws IOException, RequestFailedException {
+		Channel versionRequest = new HMACChannel(new TCPChannel(server.createSocket()), hmac);
+		versionRequest.write(req);
+		try {
+			return (T) responseClass.cast(versionRequest.read());
+
+		} catch (ClassCastException e) {
+			// we received a wrong object, try again
+			if (retryCounter > 0)
+				return retryableRequestToFileserver(server, req, retryCounter - 1, responseClass);
+			else
+				throw new RequestFailedException();
+		} finally {
+			versionRequest.close();
+		}
+	}
+	
+	public void distributeFile(ConcurrentHashMap<Long, MyFileServerInfo> writeQuorum, FileInfo info, int version) throws IOException, RequestFailedException {
+
+		for (MyFileServerInfo server : writeQuorum.values()) {
+
+			UploadRequest requestObj = new UploadRequest(info.getName(), version, info.getContent());
+			MessageResponse resp = retryableRequestToFileserver(server, requestObj, 1, MessageResponse.class);
+			
+//			Response res = uploadRequest(info, version, server);
+//			if (res == null || res instanceof MessageIntegrityErrorResponse) {
+//				// Try again if failed
+//				res = uploadRequest(info, version, server);
+//
+//				// TODO: what todo if upload fails 2 times ?
+//			}
 		}
 	}
 }
