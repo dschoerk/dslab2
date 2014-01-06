@@ -87,6 +87,7 @@ public class MyFileServerInfo implements Comparable<MyFileServerInfo> {
 
 	@Override
 	public int compareTo(MyFileServerInfo o) {
-		return (int)(usage-o.usage);
+		//return (int)(usage-o.usage);
+	    return usage <= o.getUsage() ? 1:-1;
 	}
 }
