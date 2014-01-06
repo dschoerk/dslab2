@@ -186,7 +186,7 @@ public class FileserverSession implements IFileServer, Runnable {
 		if (!obj.isChecksumCorrect(hmac))
 			return new MessageIntegrityErrorResponse();
 		
-		System.out.println("received hmac wrapped "+ obj.getObject().toString());
+		//System.out.println("received hmac wrapped "+ obj.getObject().toString());
 		
 		try {
 			Object o = obj.getObject();

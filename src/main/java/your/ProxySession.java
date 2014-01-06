@@ -295,7 +295,6 @@ public class ProxySession implements Runnable, IProxy {
 			}
 			int version = -1;
 
-			System.err.println("read: " + readQuorum.values().size() + " write: " + writeQuorum.values().size());
 
 			for (MyFileServerInfo server : readQuorum.values()) {
 
