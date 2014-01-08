@@ -310,7 +310,8 @@ public class Proxy implements IProxyCli, Runnable {
 	public PublicKey getUserKey(String username) {
 		for (File s : keyFolder.listFiles()) {
 			if (s.getName().equals(username + ".pub.pem")) {
-				PEMReader in;
+				
+				PEMReader in = null;
 				try {
 					in = new PEMReader(new FileReader(s));
 					return (PublicKey) in.readObject();
@@ -318,6 +319,13 @@ public class Proxy implements IProxyCli, Runnable {
 					e.printStackTrace();
 				} catch (IOException e) {
 					e.printStackTrace();
+				} finally
+				{
+					try {
+						in.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
