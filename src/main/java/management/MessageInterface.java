@@ -1,6 +1,9 @@
 package management;
 
 import java.rmi.*;
+import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.List;
 
 public interface MessageInterface extends Remote {
@@ -12,7 +15,7 @@ public interface MessageInterface extends Remote {
     
     void subscribe(RMICallbackInterface client,String user, String file, int trigger) throws RemoteException;
     
-    char[] getProxyPublicKey() throws RemoteException;
-    void setUserPublicKey (String user, char[] key) throws RemoteException;
+    PublicKey getProxyPublicKey() throws RemoteException;
+    void setUserPublicKey (String user, PublicKey o) throws RemoteException;
     
 }

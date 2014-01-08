@@ -105,7 +105,7 @@ public class Test {
         
         for(int i=0; i<clients; i++){
             
-            threadpool.execute(new TestSession(i,downRate,upRate,overwrite,filesize));
+            //threadpool.execute(new TestSession(i,downRate,upRate,overwrite,filesize));
         }
         System.out.println("startet "+clients+"clients");
         System.out.println("with "+downRate+" downloads/min "+upRate+" uploads/min");

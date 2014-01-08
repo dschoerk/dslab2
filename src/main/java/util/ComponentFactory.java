@@ -96,6 +96,7 @@ public class ComponentFactory {
 
 		KeyPair keyPair = (KeyPair) in.readObject();
 		PrivateKey privKey = keyPair.getPrivate();
+		PublicKey pubKey = keyPair.getPublic();
 		in.close();
 		
 		String hmacKey = config.getString("hmac.key");
@@ -106,7 +107,7 @@ public class ComponentFactory {
 		byte[] keyData = Hex.decode(keyBytes);
 		Key shaKey = new SecretKeySpec(keyData, "HmacSHA256");
 
-		return new Proxy(tcpPort, udpPort, timeout, checkPeriod, shaKey, new File(keydir), privKey, shell);
+		return new Proxy(tcpPort, udpPort, timeout, checkPeriod, shaKey, new File(keydir), privKey,pubKey, shell);
 	}
 
 	/**

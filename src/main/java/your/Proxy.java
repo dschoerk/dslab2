@@ -3,6 +3,7 @@ package your;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -43,6 +44,7 @@ import networkio.HMACChannel;
 import networkio.UDPChannel;
 
 import org.bouncycastle.openssl.PEMReader;
+import org.bouncycastle.openssl.PEMWriter;
 
 import proxy.IProxyCli;
 import util.ComponentFactory;
@@ -68,6 +70,7 @@ public class Proxy implements IProxyCli, Runnable {
 	private ProxyManagement managementComponent;
 
 	private PrivateKey privKey;
+	private PublicKey pubKey;
 	private File keyFolder;
 	private Key shaKey;
 	private Mac hmac;
@@ -81,7 +84,7 @@ public class Proxy implements IProxyCli, Runnable {
 	}
 
 	public Proxy(int tcpPort, int udpPort, final int timeout, int checkPeriod, Key shaKey, File keyFolder,
-			PrivateKey privKey, Shell shell) throws IOException {
+			PrivateKey privKey, PublicKey pubKey, Shell shell) throws IOException {
 		if (shell != null) {
 			shell.register(this);
 			shellThread = new Thread(shell);
@@ -89,6 +92,7 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 
 		this.privKey = privKey;
+		this.pubKey = pubKey;
 		this.keyFolder = keyFolder;
 		this.shaKey = shaKey;
 
@@ -295,6 +299,9 @@ public class Proxy implements IProxyCli, Runnable {
 	public PrivateKey getPrivKey() {
 		return privKey;
 	}
+	public PublicKey getPubKey() {
+        return pubKey;
+    }
 
 	public PublicKey getUserKey(String username) {
 		for (File s : keyFolder.listFiles()) {
@@ -312,6 +319,20 @@ public class Proxy implements IProxyCli, Runnable {
 		}
 
 		return null;
+	}
+	
+	public void setUserKey(String username, PublicKey key){
+	    PEMWriter out;
+        try {
+            out = new PEMWriter(new FileWriter(keyFolder+"/"+username+".pub.pem"));
+            out.writeObject(key);
+            out.flush();
+            out.close();
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        
 	}
 
 	public ProxyManagement getManagementComonent() {
