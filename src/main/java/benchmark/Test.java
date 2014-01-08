@@ -25,6 +25,7 @@ public class Test {
     
     private Fileserver[] fileserver;
     Proxy proxy;
+    Shell shell;
 
     /**
      * @param args
@@ -36,7 +37,7 @@ public class Test {
     
     public Test(){
         
-        Shell shell = new Shell("Proxy", System.out, System.in);
+        shell = new Shell("Testbench", System.out, System.in);
 
         shell.register(this);
         Thread shellThread = new Thread(shell);
@@ -59,12 +60,12 @@ public class Test {
             fileserver = new Fileserver[fileServerNumber];
             for(int i=0; i<fileServerNumber;i++){
                 fileserver[i]=(Fileserver) factory.startFileServer(new Config("fs"+(i+1)), new Shell("FS"+(i+1), System.out, System.in));
-                System.out.println("fs"+i+" started");
+                shell.writeLine("fs"+i+" started");
             }
             
             proxy = (Proxy) factory.startProxy(new Config("proxy"), new Shell("Proxy", System.out, System.in));
             Thread.sleep(Util.WAIT_FOR_COMPONENT_STARTUP);
-            System.out.println("proxy started");
+            shell.writeLine("proxy started");
             
             
             //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -113,8 +114,14 @@ public class Test {
                 e.printStackTrace();
             }
         }
-        System.out.println("startet "+clients+"clients");
-        System.out.println("with "+downRate+" downloads/min "+upRate+" uploads/min");
+        try {
+            shell.writeLine("startet "+clients+"clients");
+            shell.writeLine("with "+downRate+" downloads/min "+upRate+" uploads/min");
+        } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        
         
     }
     
@@ -124,13 +131,19 @@ public class Test {
         
         try {
             
+            threadpool.shutdown();
+            threadpool.awaitTermination(2, TimeUnit.SECONDS);
             threadpool.shutdownNow();
+            
             for(int i=0; i<fileServerNumber;i++){
                 System.out.println(fileserver[i].exit());
             }
             proxy.exit();
             System.in.close();
         } catch (IOException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        } catch (InterruptedException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
