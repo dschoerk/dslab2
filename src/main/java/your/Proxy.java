@@ -261,12 +261,12 @@ public class Proxy implements IProxyCli, Runnable {
 					try {
 						AliveMessage msg = (AliveMessage) hmacchannel.read();
 						int port = msg.getPort();
-						
+
 						DatagramPacket p = udpchannel.getLatestPacket();
 						MyFileServerInfo server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
 						server = findServer(server);
 						if (server == null) {
-						    server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
+							server = new MyFileServerInfo(p.getAddress(), port, 0, true, port);
 							knownFileservers.add(server);
 						}
 
@@ -299,9 +299,10 @@ public class Proxy implements IProxyCli, Runnable {
 	public PrivateKey getPrivKey() {
 		return privKey;
 	}
+
 	public PublicKey getPubKey() {
-        return pubKey;
-    }
+		return pubKey;
+	}
 
 	public PublicKey getUserKey(String username) {
 		for (File s : keyFolder.listFiles()) {
@@ -320,19 +321,19 @@ public class Proxy implements IProxyCli, Runnable {
 
 		return null;
 	}
-	
-	public void setUserKey(String username, PublicKey key){
-	    PEMWriter out;
-        try {
-            out = new PEMWriter(new FileWriter(keyFolder+"/"+username+".pub.pem"));
-            out.writeObject(key);
-            out.flush();
-            out.close();
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        
+
+	public void setUserKey(String username, PublicKey key) {
+		PEMWriter out;
+		try {
+			out = new PEMWriter(new FileWriter(keyFolder + "/" + username + ".pub.pem"));
+			out.writeObject(key);
+			out.flush();
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+
 	}
 
 	public ProxyManagement getManagementComonent() {
@@ -341,14 +342,15 @@ public class Proxy implements IProxyCli, Runnable {
 
 	public Set<MyFileServerInfo> getOnlineServer() {
 
-		Set<MyFileServerInfo> set = new HashSet<MyFileServerInfo>();
+		synchronized (knownFileservers) {
+			Set<MyFileServerInfo> set = new HashSet<MyFileServerInfo>();
 
-		for (MyFileServerInfo inf : knownFileservers) {
-			if (inf.isOnline())
-				set.add(inf);
+			for (MyFileServerInfo inf : knownFileservers) {
+				if (inf.isOnline())
+					set.add(inf);
+			}
+			return set;
 		}
-
-		return set;
 	}
 
 	public Key getShaKey() {

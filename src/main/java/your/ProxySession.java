@@ -9,13 +9,11 @@ import java.security.NoSuchAlgorithmException;
 import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.util.Arrays;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -64,8 +62,6 @@ public class ProxySession implements Runnable, IProxy {
 	private Channel base_channel;
 	private Channel channel_in;
 	private Channel channel_out;
-	private int NumberNR;
-	private int NumberNW;
 
 	private UserDB users;
 
@@ -234,42 +230,44 @@ public class ProxySession implements Runnable, IProxy {
 	@Override
 	public Response download(DownloadTicketRequest request) throws IOException {
 
+		if (user == null)
+			return new MessageResponse("You have to login first");
+
 		try {
-			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
-
-			if (user == null)
-				return new MessageResponse("You have to login first");
-
-			Set<MyFileServerInfo> readQuorum = getQuorum(NumberNR);
+			Set<MyFileServerInfo> onlineServer = parent.getOnlineServer();
+			int NumberNR = (int) Math.ceil(onlineServer.size() / 2.0);
+			Set<MyFileServerInfo> readQuorum = getQuorum(onlineServer, NumberNR);
 
 			if (readQuorum.isEmpty()) {
 				return new MessageResponse("No Fileserver available");
 			}
 
 			boolean filefound = false;
-			
+
 			int newestVersion = -2;
 			MyFileServerInfo newestVersionServer = null;
-			for(MyFileServerInfo server : readQuorum)
-			{
+			for (MyFileServerInfo server : readQuorum) {
 				VersionRequest vreq = new VersionRequest(request.getFilename());
-				
+
 				// -1 not exist
 				int version = ((VersionResponse) (retryableRequestToFileserver(server, vreq, 1, VersionResponse.class)))
 						.getVersion();
-				
-				if(version > newestVersion) //TODO: aufsteigend oder absteigend sortiert wegen usage?
+
+				if (version > newestVersion) // TODO: aufsteigend oder
+												// absteigend sortiert wegen
+												// usage?
 				{
 					newestVersion = version;
 					newestVersionServer = server;
 				}
 			}
-			
+
 			if (newestVersion == -1)
 				return new MessageResponse("File \"" + request.getFilename() + "\" does not exist");
 
 			InfoRequest ireq = new InfoRequest(request.getFilename());
-			InfoResponse infoResponseObj = retryableRequestToFileserver(newestVersionServer, ireq, 1, InfoResponse.class);
+			InfoResponse infoResponseObj = retryableRequestToFileserver(newestVersionServer, ireq, 1,
+					InfoResponse.class);
 
 			if (user.getCredits() < infoResponseObj.getSize())
 				return new MessageResponse("Not enough Credits");
@@ -301,10 +299,12 @@ public class ProxySession implements Runnable, IProxy {
 			return new MessageResponse("You have to login first");
 		try {
 
-			NumberNR = (int) Math.ceil(parent.getOnlineServer().size() / 2.0);
-			NumberNW = (int) Math.floor(parent.getOnlineServer().size() / 2.0) + 1;
-			Set<MyFileServerInfo> readQuorum = getQuorum(NumberNR);
-			Set<MyFileServerInfo> writeQuorum = getQuorum(NumberNW);
+			Set<MyFileServerInfo> servers = parent.getOnlineServer();
+			int NumberNR = (int) Math.ceil(servers.size() / 2.0);
+			int NumberNW = (int) Math.floor(servers.size() / 2.0) + 1;
+			Set<MyFileServerInfo> readQuorum = getQuorum(servers, NumberNR);
+			Set<MyFileServerInfo> writeQuorum = getQuorum(servers, NumberNW);
+			
 			if (readQuorum.isEmpty()) {
 				return new MessageResponse("No Fileserver available");
 			}
@@ -346,17 +346,13 @@ public class ProxySession implements Runnable, IProxy {
 		return user;
 	}
 
-	private Set<MyFileServerInfo> getQuorum(int quorumSize) {
+	private Set<MyFileServerInfo> getQuorum(Set<MyFileServerInfo> known, int quorumSize) {
 
 		Set<MyFileServerInfo> writeQuorum = new HashSet<MyFileServerInfo>();
-		Set<MyFileServerInfo> known = parent.getOnlineServer();
-
 		Iterator<MyFileServerInfo> it = known.iterator();
-
-		
 		for (int i = 0; i < quorumSize; i++)
 			writeQuorum.add(it.next());
-		
+
 		return writeQuorum;
 	}
 
@@ -415,8 +411,8 @@ public class ProxySession implements Runnable, IProxy {
 		}
 	}
 
-	public void distributeFile(Set<MyFileServerInfo> writeQuorum, FileInfo info, int version)
-			throws IOException, RequestFailedException {
+	public void distributeFile(Set<MyFileServerInfo> writeQuorum, FileInfo info, int version) throws IOException,
+			RequestFailedException {
 
 		for (MyFileServerInfo server : writeQuorum) {
 
