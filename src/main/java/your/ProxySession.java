@@ -14,6 +14,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -348,7 +350,7 @@ public class ProxySession implements Runnable, IProxy {
 
 	private Set<MyFileServerInfo> getQuorum(Set<MyFileServerInfo> known, int quorumSize) {
 
-		Set<MyFileServerInfo> writeQuorum = new HashSet<MyFileServerInfo>();
+		SortedSet<MyFileServerInfo> writeQuorum = new TreeSet<MyFileServerInfo>();
 		Iterator<MyFileServerInfo> it = known.iterator();
 		for (int i = 0; i < quorumSize; i++)
 			writeQuorum.add(it.next());

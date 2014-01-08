@@ -343,7 +343,7 @@ public class Proxy implements IProxyCli, Runnable {
 	public Set<MyFileServerInfo> getOnlineServer() {
 
 		synchronized (knownFileservers) {
-			Set<MyFileServerInfo> set = new HashSet<MyFileServerInfo>();
+			SortedSet<MyFileServerInfo> set = new TreeSet<MyFileServerInfo>();
 
 			for (MyFileServerInfo inf : knownFileservers) {
 				if (inf.isOnline())
