@@ -350,13 +350,15 @@ public class ProxySession implements Runnable, IProxy {
 
 	private Set<MyFileServerInfo> getQuorum(Set<MyFileServerInfo> known, int quorumSize) {
 
-		SortedSet<MyFileServerInfo> writeQuorum = new TreeSet<MyFileServerInfo>();
+		SortedSet<MyFileServerInfo> Quorum = new TreeSet<MyFileServerInfo>();
+
 		Iterator<MyFileServerInfo> it = known.iterator();
 		for (int i = 0; i < quorumSize; i++)
-			writeQuorum.add(it.next());
-
-		return writeQuorum;
+			Quorum.add(it.next());
+		
+		return Quorum;
 	}
+
 
 	static {
 		try {
