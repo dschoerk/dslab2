@@ -19,6 +19,7 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.List;
 
 import javax.crypto.Cipher;
@@ -75,8 +76,8 @@ public class Client implements IClientCli, RMICallbackInterface {
 	private File downloadDirectory;
 	private File keyDir;
 	private boolean loggedin;
-	private String username="";
-	
+	private String username = "";
+
 	private Shell shell;
 
 	MessageInterface managementComponent;
@@ -95,7 +96,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 			Thread shellThread = new Thread(shell);
 			shellThread.start();
 		}
-		this.shell=shell;
+		this.shell = shell;
 
 		this.downloadDirectory = downloadDir;
 		this.keyDir = keyDir;
@@ -184,6 +185,14 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 			LoginMessageOk msg_2nd = (LoginMessageOk) response;
 
+			final String B64 = "a-zA-Z0-9/+";
+			assert msg_2nd.toString().matches(
+					"!ok [" + B64 + "]{43}= [" + B64 + "]{43}= [" + B64 + "]{43}= [" + B64 + "]{22}==") : "2nd message";
+
+			if (!Arrays.equals(msg_2nd.getClientChallenge(), client_challenge)) {
+				return new LoginResponse(Type.WRONG_CREDENTIALS);
+			}
+
 			byte[] key = Base64.decode(msg_2nd.getSecretKey());
 			SecretKey originalKey = new SecretKeySpec(key, 0, key.length, "AES");
 			byte[] iv = Base64.decode(msg_2nd.getIV());
@@ -195,9 +204,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 			response = aes_channel.read();
 			LoginResponse loginresponse = (LoginResponse) response;
 
-			if (loginresponse.getType() == Type.SUCCESS){
+			if (loginresponse.getType() == Type.SUCCESS) {
 				loggedin = true;
-				this.username=username;
+				this.username = username;
 			}
 
 			return loginresponse;
@@ -357,7 +366,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 		aes_channel.write(message);
 
 		loggedin = false;
-		username="";
+		username = "";
 		// muss gelesen werden!
 
 		MessageResponse uploadresponse = (MessageResponse) aes_channel.read();
@@ -389,10 +398,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 	@Command
 	public MessageResponse subscribe(String file, int trigger) throws IOException {
-	    
-	    if (!loggedin)
-            return new MessageResponse("Login first");
-	    
+
+		if (!loggedin)
+			return new MessageResponse("Login first");
+
 		try {
 			UnicastRemoteObject.exportObject(this, 0);
 		} catch (ExportException E) {
@@ -405,24 +414,24 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 	@Command
 	public MessageResponse getProxyPublicKey() throws IOException {
-	    PEMWriter out = new PEMWriter(new FileWriter(keyDir+"/proxy.pub.pem"));
-	    out.writeObject(managementComponent.getProxyPublicKey());
-	    out.flush();
-	    out.close();
+		PEMWriter out = new PEMWriter(new FileWriter(keyDir + "/proxy.pub.pem"));
+		out.writeObject(managementComponent.getProxyPublicKey());
+		out.flush();
+		out.close();
 		return new MessageResponse("Successfully downloaded PublicKey");
 	}
 
 	@Command
 	public MessageResponse setUserPublicKey(String user) throws IOException {
 
-	    PEMReader r = new PEMReader(new FileReader(keyDir+"/"+user+".pub.pem"));
-	    Object o = r.readObject();
-	    r.close();
-	    if(o!=null){
-	        managementComponent.setUserPublicKey(user, ((PublicKey)o));
-	        return new MessageResponse("Successfully uploaded PrivateKey for "+user);
-	    }
-		return new MessageResponse("Couldn't find public key for "+user);
+		PEMReader r = new PEMReader(new FileReader(keyDir + "/" + user + ".pub.pem"));
+		Object o = r.readObject();
+		r.close();
+		if (o != null) {
+			managementComponent.setUserPublicKey(user, ((PublicKey) o));
+			return new MessageResponse("Successfully uploaded PrivateKey for " + user);
+		}
+		return new MessageResponse("Couldn't find public key for " + user);
 	}
 
 	@Command
@@ -439,13 +448,13 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 	@Override
 	public void notifySubscriber(String file, int trigger) {
-	    
+
 		try {
-            shell.writeLine(file+ " has been downloaded "+trigger+"time(s)");
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+			shell.writeLine(file + " has been downloaded " + trigger + "time(s)");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
 
 	}
 }

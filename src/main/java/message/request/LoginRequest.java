@@ -42,6 +42,6 @@ public class LoginRequest implements Request {
 
 	@Override
 	public String toString() {
-		return String.format("!login %s %s", getUsername()/* , getPassword() */);
+		return String.format("!login %s %s", getUsername()/* , getPassword() */, new String(challenge));
 	}
 }
