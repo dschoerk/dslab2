@@ -138,16 +138,8 @@ public class Fileserver implements IFileServerCli, Runnable {
 		return new MessageResponse("closed Fileserver");
 	}
 
-	public File getDownloadDirectory() {
+	public synchronized File getDownloadDirectory() {
 		return downloadDir;
-	}
-
-	public File getFile(String file) {
-		for (File f : downloadDir.listFiles()) {
-			if (f.getName().equals(file))
-				return f;
-		}
-		return null;
 	}
 
 	public byte[] getFileContent(File f) {

@@ -260,6 +260,9 @@ public class Proxy implements IProxyCli, Runnable {
 
 					try {
 						AliveMessage msg = (AliveMessage) hmacchannel.read();
+						
+						assert msg.toString().matches("!alive 1[0-9]{4}") : "alive message";
+						
 						int port = msg.getPort();
 
 						DatagramPacket p = udpchannel.getLatestPacket();
@@ -307,7 +310,8 @@ public class Proxy implements IProxyCli, Runnable {
 	public PublicKey getUserKey(String username) {
 		for (File s : keyFolder.listFiles()) {
 			if (s.getName().equals(username + ".pub.pem")) {
-				PEMReader in;
+				
+				PEMReader in = null;
 				try {
 					in = new PEMReader(new FileReader(s));
 					return (PublicKey) in.readObject();
@@ -315,6 +319,13 @@ public class Proxy implements IProxyCli, Runnable {
 					e.printStackTrace();
 				} catch (IOException e) {
 					e.printStackTrace();
+				} finally
+				{
+					try {
+						in.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 		}
@@ -343,7 +354,7 @@ public class Proxy implements IProxyCli, Runnable {
 	public Set<MyFileServerInfo> getOnlineServer() {
 
 		synchronized (knownFileservers) {
-			Set<MyFileServerInfo> set = new HashSet<MyFileServerInfo>();
+			SortedSet<MyFileServerInfo> set = new TreeSet<MyFileServerInfo>();
 
 			for (MyFileServerInfo inf : knownFileservers) {
 				if (inf.isOnline())

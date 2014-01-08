@@ -12,8 +12,9 @@ import org.bouncycastle.util.encoders.Base64;
 public class HMACWrapped implements Serializable {
 
 	private static final long serialVersionUID = 3599128059842422585L;
-	private byte[] object;
 	private byte[] checksum;
+	private byte[] object;
+	
 
 	public HMACWrapped(Object o, Mac hmac) throws IOException {
 		byte[] enc = Serializer.encode(o);
@@ -43,5 +44,11 @@ public class HMACWrapped implements Serializable {
 	public byte [] getObjectBytes() throws IOException {
 
 		return object;
+	}
+	
+	@Override
+	public String toString()
+	{
+		return new String(checksum)+" "+new String(object);
 	}
 }

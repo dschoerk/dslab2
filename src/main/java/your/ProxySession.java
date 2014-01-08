@@ -14,6 +14,8 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -142,6 +144,12 @@ public class ProxySession implements Runnable, IProxy {
 	public LoginResponse login(LoginRequest lr) throws IOException {
 		User user = users.getUser(lr.getUsername());
 		PublicKey key = parent.getUserKey(lr.getUsername());
+		if (key == null)
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+
+		final String B64 = "a-zA-Z0-9/+";
+		assert lr.toString().matches("!login \\w+ [" + B64 + "]{43}=") : "1st message";
+
 		channel_out = new RSAChannel(base_channel, key, Cipher.ENCRYPT_MODE);
 
 		SecureRandom rand = new SecureRandom();
@@ -164,7 +172,7 @@ public class ProxySession implements Runnable, IProxy {
 		rand.nextBytes(iv);
 		// rand.nextBytes(sec_key);
 
-		LoginMessageOk sec = new LoginMessageOk(Base64.encode(lr.getChallenge()), Base64.encode(proxy_challenge),
+		LoginMessageOk sec = new LoginMessageOk(lr.getChallenge(), Base64.encode(proxy_challenge),
 				Base64.encode(sec_key.getEncoded()), Base64.encode(iv));
 		channel_out.write(sec);
 
@@ -176,10 +184,14 @@ public class ProxySession implements Runnable, IProxy {
 			LoginMessageFinal resp = (LoginMessageFinal) o;
 			byte[] solved_challenge = Base64.decode(resp.getChallenge());
 
+			assert resp.toString().matches("[" + B64 + "]{43}=") : "3rd message";
+
 			if (!Arrays.equals(solved_challenge, proxy_challenge))
 				return new LoginResponse(Type.WRONG_CREDENTIALS);
 
 		} catch (IOException e) {
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+		} catch (ClassCastException e) {
 			return new LoginResponse(Type.WRONG_CREDENTIALS);
 		}
 
@@ -304,7 +316,7 @@ public class ProxySession implements Runnable, IProxy {
 			int NumberNW = (int) Math.floor(servers.size() / 2.0) + 1;
 			Set<MyFileServerInfo> readQuorum = getQuorum(servers, NumberNR);
 			Set<MyFileServerInfo> writeQuorum = getQuorum(servers, NumberNW);
-			
+
 			if (readQuorum.isEmpty()) {
 				return new MessageResponse("No Fileserver available");
 			}
@@ -348,13 +360,15 @@ public class ProxySession implements Runnable, IProxy {
 
 	private Set<MyFileServerInfo> getQuorum(Set<MyFileServerInfo> known, int quorumSize) {
 
-		Set<MyFileServerInfo> writeQuorum = new HashSet<MyFileServerInfo>();
+		SortedSet<MyFileServerInfo> Quorum = new TreeSet<MyFileServerInfo>();
+
 		Iterator<MyFileServerInfo> it = known.iterator();
 		for (int i = 0; i < quorumSize; i++)
-			writeQuorum.add(it.next());
-
-		return writeQuorum;
+			Quorum.add(it.next());
+		
+		return Quorum;
 	}
+
 
 	static {
 		try {

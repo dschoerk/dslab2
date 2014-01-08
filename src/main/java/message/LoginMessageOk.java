@@ -36,4 +36,9 @@ public class LoginMessageOk implements Serializable {
 	public byte[] getIV() {
 		return iv;
 	}
+
+	public String toString() {
+		return "!ok " + new String(client_challenge) + " " + new String(proxy_challenge) + " " + new String(secret_key)
+				+ " " + new String(iv);
+	}
 }

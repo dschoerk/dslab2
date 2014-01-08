@@ -44,7 +44,8 @@ public class FileserverSession implements IFileServer, Runnable {
 	private Channel tcpchannel;
 	private Channel mactcpchannel;
 	private Channel channel;
-	private HashMap<String, Integer> version= new HashMap<String, Integer>();
+	private HashMap<String, Integer> version = new HashMap<String, Integer>();
+	private File downloadDir;
 	private static Map<Class<?>, Method> commandMap = new HashMap<Class<?>, Method>();
 	private static Set<Class<?>> hasArgument = new HashSet<Class<?>>();
 
@@ -52,7 +53,10 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		this.socket = socket;
 		this.parent = parent;
-		version=parent.getVersionMap();
+		
+		downloadDir = new File(parent.getDownloadDirectory().getAbsolutePath());
+		
+		version = parent.getVersionMap();
 		try {
 			hmac = Mac.getInstance("HmacSHA256");
 			hmac.init(parent.getHMACKey());
@@ -77,12 +81,11 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		try {
 			Object o = tcpchannel.read();
-			
-			if(!(o instanceof DownloadFileRequest || o instanceof HMACWrapped))
-			{
+
+			if (!(o instanceof DownloadFileRequest || o instanceof HMACWrapped)) {
 				System.err.println("TODO: wrap request > " + o.toString());
 			}
-			
+
 			channel = tcpchannel;
 			Object response = null;
 			if (hasArgument.contains(o.getClass())) {
@@ -90,7 +93,7 @@ public class FileserverSession implements IFileServer, Runnable {
 			} else {
 				response = commandMap.get(o.getClass()).invoke(this);
 			}
-			
+
 			channel.write(response);
 
 		} catch (IOException e) {
@@ -127,11 +130,12 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		DownloadTicket ticket = request.getTicket();
 
-		File f = parent.getFile(ticket.getFilename());
+		File f = getFile(ticket.getFilename());
 		if (f == null)
 			return new MessageResponse("File \"" + request.getTicket().getFilename() + "\" does not exist");
 
-		if (!ChecksumUtils.verifyChecksum(request.getTicket().getUsername(), f, version.get(request.getTicket().getFilename()), request.getTicket().getChecksum())) {
+		if (!ChecksumUtils.verifyChecksum(request.getTicket().getUsername(), f,
+				version.get(request.getTicket().getFilename()), request.getTicket().getChecksum())) {
 			return new MessageResponse("Download Ticket failed Checksum Test");
 		}
 
@@ -145,7 +149,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 		InfoResponse response = new InfoResponse(filename, -1); // file does not
 																// exist
-		File f = parent.getFile(filename);
+		File f = getFile(filename);
 		if (f != null)
 			response = new InfoResponse(filename, f.length());
 
@@ -154,7 +158,7 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	@Override
 	public Response version(VersionRequest request) throws IOException {
-		if(!(version.containsKey(request.getFilename())))
+		if (!(version.containsKey(request.getFilename())))
 			return new VersionResponse(request.getFilename(), -1);
 		return new VersionResponse(request.getFilename(), version.get(request.getFilename()));
 	}
@@ -162,14 +166,14 @@ public class FileserverSession implements IFileServer, Runnable {
 	@Override
 	public MessageResponse upload(UploadRequest request) throws IOException {
 
-//		System.out.println("UPLOADED");
-		
+		// System.out.println("UPLOADED");
+
 		try {
 			FileOutputStream fos = new FileOutputStream(parent.getDownloadDirectory().getAbsolutePath() + "/"
 					+ request.getFilename());
 			fos.write(request.getContent());
 			fos.close();
-			version.put(request.getFilename(),request.getVersion());
+			version.put(request.getFilename(), request.getVersion());
 			return new MessageResponse("File \"" + request.getFilename() + "\" has been uploaded");
 		} catch (IOException e) {
 			return new MessageResponse("Error while uploading\"" + request.getFilename() + "\" !");
@@ -177,17 +181,27 @@ public class FileserverSession implements IFileServer, Runnable {
 
 	}
 
+	public File getFile(String file) {
+		for (File f : downloadDir.listFiles()) {
+			if (f.getName().equals(file))
+				return f;
+		}
+		return null;
+	}
+
 	public Response hmacwrapped(HMACWrapped obj) throws IOException {
-		
-//		System.out.println("checksum correct: " + obj.isChecksumCorrect(hmac));
+
+		// System.out.println("checksum correct: " +
+		// obj.isChecksumCorrect(hmac));
 
 		channel = mactcpchannel;
-		
+
 		if (!obj.isChecksumCorrect(hmac))
 			return new MessageIntegrityErrorResponse();
-		
-		//System.out.println("received hmac wrapped "+ obj.getObject().toString());
-		
+
+		// System.out.println("received hmac wrapped "+
+		// obj.getObject().toString());
+
 		try {
 			Object o = obj.getObject();
 			Object response = null;

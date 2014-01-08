@@ -17,4 +17,9 @@ public class LoginMessageFinal implements Serializable {
 	public byte[] getChallenge() {
 		return challenge;
 	}
+
+	@Override
+	public String toString() {
+		return new String(challenge);
+	}
 }
