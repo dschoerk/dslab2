@@ -260,6 +260,9 @@ public class Proxy implements IProxyCli, Runnable {
 
 					try {
 						AliveMessage msg = (AliveMessage) hmacchannel.read();
+						
+						assert msg.toString().matches("!alive 1[0-9]{4}") : "alive message";
+						
 						int port = msg.getPort();
 
 						DatagramPacket p = udpchannel.getLatestPacket();

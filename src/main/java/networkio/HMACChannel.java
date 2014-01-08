@@ -34,6 +34,7 @@ public class HMACChannel extends Channel {
 		}
 
 		HMACWrapped w = new HMACWrapped(data, hash);
+		assert w.toString().matches("[a-zA-Z0-9+/]{43}= [\\s[^\\s]]+");
 		parent.write(Serializer.encode(w));
 	}
 
