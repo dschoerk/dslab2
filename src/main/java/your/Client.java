@@ -135,13 +135,16 @@ public class Client implements IClientCli, RMICallbackInterface {
 					return privKey;
 
 				} catch (FileNotFoundException e) {
-					e.printStackTrace();
+					return null;
+					// failed to read key
+					// e.printStackTrace();
 				} catch (IOException e) {
-					e.printStackTrace();
+					return null;
+					// failed to read key
+					// e.printStackTrace();
 				}
 			}
 		}
-
 		return null;
 	}
 
@@ -155,6 +158,10 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		Key privk = getUserKey(username, password); // read private key for
 													// username
+
+		if (privk == null)
+			return new LoginResponse(Type.WRONG_CREDENTIALS);
+
 		rsaChannelFromProxy = new RSAChannel(base_channel, privk, Cipher.DECRYPT_MODE);
 
 		SecureRandom rand = new SecureRandom();
@@ -301,7 +308,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 		} catch (SocketException e) {
 			return new MessageResponse("Lost Connection");
-		} 
+		}
 	}
 
 	@Command
