@@ -1,10 +1,15 @@
 package management;
 
+import java.io.FileWriter;
 import java.rmi.*;
 import java.rmi.registry.*;
 import java.rmi.server.UnicastRemoteObject;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.util.*;
 import java.util.Map.Entry;
+
+import org.bouncycastle.openssl.PEMWriter;
 
 import util.Config;
 import your.FileInfo;
@@ -99,9 +104,9 @@ public class ProxyManagement extends UnicastRemoteObject implements
     }
 
     @Override
-    public char[] getProxyPublicKey() throws RemoteException {
+    public PublicKey getProxyPublicKey() throws RemoteException {
         
-        return null;
+        return parent.getPubKey();
     }
 
     @Override
@@ -113,9 +118,9 @@ public class ProxyManagement extends UnicastRemoteObject implements
     }
 
     @Override
-    public void setUserPublicKey(String user, char[] key)
+    public void setUserPublicKey(String user, PublicKey key)
             throws RemoteException {
-        // TODO Auto-generated method stub
+        parent.setUserKey(user, key);
 
     }
     
@@ -153,12 +158,14 @@ public class ProxyManagement extends UnicastRemoteObject implements
     }
 
     public void removeSubscriptions(String user) {
+        ArrayList<Subscription> toRemove = new ArrayList<Subscription>();
         synchronized(subscribers){
             for (Subscription s : subscribers) {
                 if (s.getUser().equals(user)) {
-                    subscribers.remove(s);
+                    toRemove.add(s);
                 }
             }
+            subscribers.removeAll(toRemove);
         }
     }
 
