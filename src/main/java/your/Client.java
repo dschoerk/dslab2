@@ -450,7 +450,7 @@ public class Client implements IClientCli, RMICallbackInterface {
 	public void notifySubscriber(String file, int trigger) {
 
 		try {
-			shell.writeLine(file + " has been downloaded " + trigger + "time(s)");
+			shell.writeLine(file + " has been downloaded " + trigger + " time(s)");
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

@@ -130,7 +130,7 @@ public class Test {
         
         
         try {
-            
+            shell.writeLine("terminate clients...");
             threadpool.shutdown();
             threadpool.awaitTermination(2, TimeUnit.SECONDS);
             threadpool.shutdownNow();

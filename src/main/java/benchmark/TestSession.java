@@ -40,7 +40,7 @@ public class TestSession implements Runnable {
 
         commandqueue = new LinkedBlockingQueue<String>();
 
-        shell = new Shell("Client", System.out, System.in);
+        shell = new Shell("Client "+nr, System.out, System.in);
         cfg = new Config("client");
 
         rand = new Random(nr);
@@ -62,6 +62,7 @@ public class TestSession implements Runnable {
             try {
                 client.login("alice", "12345");
                 client.buy(999999999999999999L);
+                client.subscribe(rand.nextInt(Test.fileNumber) + ".txt", rand.nextInt(200));
             } catch (IOException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -151,7 +152,6 @@ public class TestSession implements Runnable {
                 try {
                     fileserverOnlineTimer.cancel();
                     client.exit();
-                    System.out.println("client " + number + " closed");
                 } catch (IOException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
