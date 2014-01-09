@@ -126,8 +126,9 @@ public class Client implements IClientCli, RMICallbackInterface {
 	private PrivateKey getUserKey(String username, final String password) {
 		for (File s : keyDir.listFiles()) {
 			if (s.getName().equals(username + ".pem")) {
+				PEMReader in = null;
 				try {
-					PEMReader in = new PEMReader(new FileReader(s.getAbsolutePath()), new PasswordFinder() {
+					in = new PEMReader(new FileReader(s.getAbsolutePath()), new PasswordFinder() {
 						@Override
 						public char[] getPassword() {
 							return password.toCharArray();
@@ -136,7 +137,6 @@ public class Client implements IClientCli, RMICallbackInterface {
 
 					KeyPair keyPair = (KeyPair) in.readObject();
 					PrivateKey privKey = keyPair.getPrivate();
-					in.close();
 					return privKey;
 
 				} catch (FileNotFoundException e) {
@@ -147,6 +147,11 @@ public class Client implements IClientCli, RMICallbackInterface {
 					return null;
 					// failed to read key
 					// e.printStackTrace();
+				} finally {
+					try {
+						in.close();
+					} catch (IOException e) {
+					}
 				}
 			}
 		}
